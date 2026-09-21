@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>2025-2026 Western US Snow Drought Explorer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@400;600;700&family=Merriweather:wght@700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="header-inner">
+    <a class="wordmark" href="index.html">Western US Winter &amp; Snow Drought Explorer <span class="beta-tag">BETA</span>
+      <small>NOAA Global Monitoring Laboratory &middot; Cooperative Institute for Research in Environmental Sciences</small>
+      <small>Unofficial snow drought dashboard and data explorer</small>
+    </a>
+    <nav class="site-nav">
+      <a href="index.html" class="active">Home</a>
+      <a href="findings.html">Key Findings</a>
+      <a href="explore.html">Explore the data</a>
+      <a href="maps.html">Maps</a>
+      <a href="about.html">About</a>
+    </nav>
+  </div>
+</header>
+<div class="attribution-bar">
+  Not an official NOAA or NIDIS product. Descriptive analysis only &mdash; no forecasts, no causal claims, no year-against-year comparison.
+</div>
+
+<a id="top"></a>
+<main>
+
+  <section class="panel" id="summary">
+    <h2>Regional summary vs. fixed calendar-month climatology</h2>
+    <p>
+      Computed on demand from the same monthly grid-cell-detrended values as
+      the <a href="explore.html">Explore the data</a> page &mdash; pick any
+      month or season window, any year, and which value to display. Color =
+      each variable's own physical direction of stress (not raw arithmetic
+      sign) &mdash;
+      <span style="color:#a0290f; font-weight:600;">stress</span>
+      (drier/hotter/less productive) vs.
+      <span style="color:#205493; font-weight:600;">relief</span>.
+      Native standardized indices (SPI/SPEI/EDDI/PDSI/ForDRI/ESI) already
+      are their own fixed-timescale statistic (e.g. SPI-03 is inherently a
+      trailing 3-month index), so for a season window they show their own
+      reading as of that window's last month rather than being re-aggregated
+      across it &mdash; labeled "as of &lt;month&gt;" when that applies.
+      Percent-of-normal is not shown for them, and is omitted wherever a
+      baseline mean near zero (e.g. some temperature/VPD anomaly fields)
+      would make it unstable.
+    </p>
+    <div class="selector-row">
+      <select id="summary-region-group-select" aria-label="Regions">
+        <option value="summary" selected>Summary (Western US &amp; CO-UT-WY)</option>
+        <option value="states">States</option>
+        <option value="huc2">HUC2 regions</option>
+      </select>
+      <select id="summary-window-select" aria-label="Window"></select>
+      <select id="summary-year-select" aria-label="Year"></select>
+      <select id="summary-value-select" aria-label="Value to display">
+        <option value="sigma" selected>Standardized anomaly (&sigma;)</option>
+        <option value="percentile">Percentile</option>
+        <option value="raw">Raw value</option>
+        <option value="percent_of_normal">Percent of normal</option>
+      </select>
+    </div>
+    <p id="summary-value-glossary" class="value-glossary"></p>
+    <div style="overflow-x:auto;">
+      <table class="headline-table" id="summary-table">
+        <thead>
+          <tr id="summary-table-header"><th>Variable</th><th>Product</th></tr>
+        </thead>
+        <tbody id="summary-table-body">
+          <tr><td colspan="2">Loading&hellip;</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <p class="see-also">Full dataset references and methodology notes: see the <a href="about.html">About</a> page.</p>
+
+</main>
+
+<footer class="site-footer">
+  <div class="footer-inner">
+    <p>
+      Source pipeline: snowdrought-carbon (private research repository, NOAA
+      Global Monitoring Laboratory &middot; Cooperative Institute for
+      Research in Environmental Sciences). See <a href="about.html">About</a>
+      for methodology, references, and contact information.
+    </p>
+  </div>
+</footer>
+
+<script src="js/common.js"></script>
+<script src="js/summary.js"></script>
+</body>
+</html>

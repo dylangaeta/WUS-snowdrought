@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Maps &mdash; 2025-2026 Western US Snow Drought Explorer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@400;600;700&family=Merriweather:wght@700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@10.5.0/ol.css">
+<!-- ol.source.GeoTIFF decodes TIFFs via the separate geotiff.js library at
+     runtime; OL's full bundle does not include it, so it must be loaded as
+     its own global (confirmed by a real "GeoTIFF is not defined" runtime
+     error in headless-browser testing, 2026-09) before ol.js runs. -->
+<script src="https://cdn.jsdelivr.net/npm/geotiff@2/dist-browser/geotiff.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/ol@10.5.0/dist/ol.js"></script>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="header-inner">
+    <a class="wordmark" href="index.html">Western US Winter &amp; Snow Drought Explorer <span class="beta-tag">BETA</span>
+      <small>NOAA Global Monitoring Laboratory &middot; Cooperative Institute for Research in Environmental Sciences</small>
+      <small>Unofficial snow drought dashboard and data explorer</small>
+    </a>
+    <nav class="site-nav">
+      <a href="index.html">Home</a>
+      <a href="findings.html">Key Findings</a>
+      <a href="explore.html">Explore the data</a>
+      <a href="maps.html" class="active">Maps</a>
+      <a href="about.html">About</a>
+    </nav>
+  </div>
+</header>
+<div class="attribution-bar">
+  Not an official NOAA or NIDIS product. Descriptive analysis only &mdash; no forecasts, no causal claims, no year-against-year comparison.
+</div>
+
+<main>
+
+  <section id="interactive-maps">
+    <h2>Interactive maps</h2>
+    <p>Pannable, zoomable maps rendered directly from Cloud Optimized
+      GeoTIFFs &mdash; click anywhere to read a pixel value, download the
+      underlying GeoTIFF, or copy a link back to this exact view. Colors and
+      bin thresholds are computed server-side by the same code that renders
+      the pipeline's own static maps, so they always match.</p>
+
+    <div class="product-search-wrap">
+      <input type="search" id="product-search" placeholder="Search products (e.g. &quot;snow water equivalent&quot;, &quot;PRISM&quot;)..." aria-label="Search products">
+      <div id="product-search-results" class="search-results"></div>
+    </div>
+
+    <div class="explorer-layout">
+      <nav class="category-tabs" id="category-tabs" aria-label="Dataset category"></nav>
+
+      <div>
+        <div class="selector-row">
+          <select id="product-select" aria-label="Product"></select>
+          <select id="response-select" aria-label="Variable"></select>
+        </div>
+        <div class="product-meta" id="product-meta"></div>
+
+        <div class="map-controls">
+          <select id="ol-period-select" aria-label="Month or season"></select>
+          <div class="series-toggle" id="ol-year-toggle">
+            <button data-year="baseline" class="active">Climatology</button>
+            <button data-year="2025">2025 anomaly</button>
+            <button data-year="2026">2026 anomaly</button>
+          </div>
+          <div class="year-slider-wrap" id="ol-year-slider-wrap" style="display:none;">
+            <button type="button" data-year="baseline" id="ol-year-slider-baseline">Climatology</button>
+            <span class="year-slider-caption">or anomaly for year:</span>
+            <span id="ol-year-slider-min" class="year-slider-bound"></span>
+            <input type="range" id="ol-year-slider" min="0" max="0" value="0" step="1" aria-label="Anomaly year">
+            <span id="ol-year-slider-max" class="year-slider-bound"></span>
+            <span id="ol-year-slider-label" class="year-slider-value"></span>
+          </div>
+          <label class="boundary-toggle"><input type="checkbox" id="ol-boundary-toggle" checked> State boundaries</label>
+        </div>
+        <div id="ol-map-empty" class="map-empty" style="display:none;">No interactive map available for this selection.</div>
+        <div id="ol-map-wrap">
+          <div id="ol-map" aria-label="Interactive map"></div>
+          <div id="ol-legend"></div>
+          <div id="ol-query-readout">Click the map to read a pixel value.</div>
+          <div class="ol-actions">
+            <button id="ol-screenshot-btn" type="button">Download screenshot</button>
+            <a id="ol-geotiff-link" download>Download GeoTIFF</a>
+            <button id="ol-copy-url-btn" type="button">Copy COG URL</button>
+            <button id="ol-copy-view-btn" type="button">Copy link to this view</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<script src="js/common.js"></script>
+<script src="js/map-viewer.js"></script>
+</body>
+</html>

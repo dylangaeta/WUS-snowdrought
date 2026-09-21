@@ -1,0 +1,7 @@
+# Large binary assets served from Cloudflare R2 (see js/common.js's
+# assetUrl() and scripts/sync_cogs_to_r2.sh) -- too large to commit to git /
+# serve from GitHub Pages, kept locally only as a dev fallback.
+/cogs/
+/figures/maps/
+
+.DS_Store
