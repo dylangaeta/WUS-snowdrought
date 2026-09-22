@@ -1,7 +1,8 @@
 // Interactive COG map viewer (OpenLayers, global `ol` UMD bundle from CDN).
-// Its own page (maps.html) with its own category/product/response picker --
-// mirrors "Explore the data"'s picker (js/explore.js's explorerState) but is
-// entirely independent since the two pages never load together. Colors are
+// Lives on the homepage (index.html) with its own category/product/response
+// picker -- mirrors "Explore the data"'s picker (js/explore.js's
+// explorerState) but is entirely independent since the two pages never load
+// together (Explore embeds this same page in an iframe instead). Colors are
 // never computed in JS: every value comes from the per-product style JSON
 // exported by code/17_dashboard_cog_export.py (same boundaries/colors the
 // pipeline's own PNG maps use, via common/maps.py's _diverging_bins +
@@ -29,7 +30,7 @@ let pendingSharedMapView = null;
 let lastMapSelection = null;
 
 // A URL fragment-only change (e.g. an embedding iframe's src updated to a
-// new #category=...&product=...&response=... on the same maps.html
+// new #category=...&product=...&response=... on the same index.html
 // document) does not reload the page or re-run init(), so it must be
 // re-applied explicitly via the hashchange event below -- confirmed missing
 // in real embedding testing, 2026-09.
@@ -168,7 +169,7 @@ const COG_NODATA = -32768;
 // ol.source.GeoTIFF (reproduced in isolation, 2026-09, headless Chromium);
 // WebGLTile+GeoTIFF is the stable, working combination once geotiff.js
 // (the separate TIFF-decoding library ol.source.GeoTIFF depends on at
-// runtime) is loaded alongside ol.js -- see maps.html's <script> tags.
+// runtime) is loaded alongside ol.js -- see index.html's <script> tags.
 function buildBinnedColorExpression(boundaries, colors, scale) {
   const band = ["band", 1];
   const value = ["/", band, scale];
@@ -231,7 +232,19 @@ function initInteractiveMap() {
   // pipeline's own config.py) -- set directly rather than relying on a
   // guessed center, since the manifest doesn't carry domain bounds.
   const extent = ol.proj.transformExtent([-125.0, 31.0, -101.5, 49.5], "EPSG:4326", "EPSG:3857");
+  // ol.View.fit() preserves the container's own aspect ratio, padding
+  // symmetrically outside the extent wherever the container's shape doesn't
+  // match the domain's -- the fixed 520px-tall container was much wider than
+  // this (nearly square, once Mercator-projected) domain, so it padded with
+  // a lot of visibly empty area east of the real data (and an equal amount
+  // over the Pacific to the west). Setting the container's own aspect-ratio
+  // to the extent's real, computed ratio first removes that padding instead
+  // of guessing a height.
+  const mapEl = document.getElementById("ol-map");
+  mapEl.style.aspectRatio = `${(extent[2] - extent[0]) / (extent[3] - extent[1])}`;
+  olMapState.map.updateSize();
   olMapState.map.getView().fit(extent, { size: olMapState.map.getSize() || [600, 500] });
+  olMapState.homeExtent = extent; // "Reset view" button re-fits to this after a user pans/zooms away
 
   document.getElementById("ol-period-select").addEventListener("change", (event) => {
     olMapState.period = event.target.value;
@@ -269,6 +282,24 @@ function initInteractiveMap() {
   });
   document.getElementById("ol-boundary-toggle").addEventListener("change", (event) => {
     olMapState.boundaryLayer.setVisible(event.target.checked);
+  });
+  document.getElementById("ol-reset-view-btn").addEventListener("click", () => {
+    olMapState.map.getView().fit(olMapState.homeExtent, { size: olMapState.map.getSize(), duration: 300 });
+  });
+  document.getElementById("ol-fullscreen-btn").addEventListener("click", () => {
+    if (document.fullscreenElement) {
+      document.exitFullscreen();
+    } else {
+      document.getElementById("ol-map-wrap").requestFullscreen();
+    }
+  });
+  // Fullscreen changes the element's real pixel size, which OL doesn't
+  // learn about on its own -- same updateSize() call the resize path
+  // already relies on elsewhere in this file.
+  document.addEventListener("fullscreenchange", () => {
+    document.getElementById("ol-fullscreen-btn").textContent =
+      document.fullscreenElement ? "Exit full screen" : "Full screen";
+    setTimeout(() => olMapState.map.updateSize(), 0);
   });
   document.getElementById("ol-screenshot-btn").addEventListener("click", takeMapScreenshot);
   document.getElementById("ol-copy-url-btn").addEventListener("click", () => {
@@ -401,33 +432,34 @@ async function updateInteractiveMapLayer() {
   const units = entry.units || "";
   const isBaseline = olMapState.year === "baseline";
   const palette = isBaseline ? style.baseline_colors : style.anomaly_colors;
-  const label = isBaseline ? `Climatology (${units})` : `${units} anomaly`;
+  // Detrend status only describes how the anomaly was computed -- not
+  // meaningful for the raw climatology view, so the badge only shows there.
+  const label = isBaseline
+    ? `Climatology (${units})`
+    : `${units} anomaly ${detrendBadgeHtml(entry.detrend_method)}`;
   const boundaries = fileEntry.boundaries;
   if (boundaries) {
     const nBins = boundaries.length - 1;
-    // Every bin boundary gets its own tick -- these are discrete
-    // BoundaryNorm bins (matching the pipeline's own static maps), not a
-    // continuous colorbar, so skipping a boundary hides a real category
-    // edge. Fixed 1-decimal formatting made adjacent boundaries render as
-    // duplicate-looking labels (e.g. -0.11 and -0.09 both "-0.1"); instead
-    // pick the fewest decimals that keep every boundary distinguishable.
-    const decimals = pickTickDecimals(boundaries);
-    // Adjacent boundaries are only 34px (one swatch) apart, too narrow for
-    // most label text, so alternate labels onto a second row -- doubles the
-    // effective horizontal spacing to 68px without touching swatch width.
-    const tickRowClass = (boundaryIndex) => (boundaryIndex % 2 === 0 ? "" : " ol-legend-tick-row2");
-    const swatches = Array.from({ length: nBins }, (_, i) => {
-      const leftTick = `<span class="ol-legend-tick${tickRowClass(i)}">${boundaries[i].toFixed(decimals)}</span>`;
-      const rightTick = i === nBins - 1
-        ? `<span class="ol-legend-tick ol-legend-tick-last${tickRowClass(nBins)}">${boundaries[i + 1].toFixed(decimals)}</span>`
-        : "";
-      return `<span class="ol-legend-swatch" style="background:${palette[i]}" title="${boundaries[i].toFixed(decimals)} to ${boundaries[i + 1].toFixed(decimals)}">${leftTick}${rightTick}</span>`;
-    }).join("");
+    // Matches common/maps.py's _label_colorbar exactly: one tick per bin,
+    // centered on the swatch it labels, not one tick per boundary -- reads
+    // the way every other legend in the pipeline's own static maps already
+    // does ("this color = this value"). Vertical, highest value at top
+    // (the standard vertical-colorbar convention) -- the sidebar this
+    // lives in is narrow and tall, not wide, so stacking bins top-to-bottom
+    // fits its real shape instead of needing a horizontal bar wider than
+    // the column it's in.
+    const centers = Array.from({ length: nBins }, (_, i) => (boundaries[i] + boundaries[i + 1]) / 2);
+    const decimals = pickTickDecimals(centers);
+    const swatches = centers.map((v, i) => {
+      const text = v.toFixed(decimals);
+      const tick = `<span class="ol-legend-tick">${text}</span>`;
+      return `<span class="ol-legend-swatch" style="background:${palette[i]}" title="${boundaries[i].toFixed(decimals)} to ${boundaries[i + 1].toFixed(decimals)}">${tick}</span>`;
+    }).reverse().join("");
     legend.innerHTML = `<div class="ol-legend-label">${label}</div><div class="ol-legend-scale">${swatches}</div>`;
   } else {
     // Native standardized indices (SPI/SPEI/EDDI/...): value IS the anomaly,
     // no boundaries computed yet -- show units only, no color scale.
-    legend.innerHTML = `<div class="ol-legend-label">${units}</div>`;
+    legend.innerHTML = `<div class="ol-legend-label">${units} ${detrendBadgeHtml(entry.detrend_method)}</div>`;
   }
 
   const colorExpr = boundaries ? buildBinnedColorExpression(boundaries, palette, fileEntry.scale) : null;

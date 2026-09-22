@@ -29,7 +29,7 @@ function regionColumnsForGroup(group) {
 function rebuildRegionColumns() {
   summaryRegionColumns = regionColumnsForGroup(summaryState.regionGroup);
   const headerRow = document.getElementById("summary-table-header");
-  while (headerRow.children.length > 2) headerRow.removeChild(headerRow.lastChild); // keep Variable/Product
+  while (headerRow.children.length > 3) headerRow.removeChild(headerRow.lastChild); // keep Variable/Product/Detrended?
   summaryRegionColumns.forEach((col) => {
     const th = document.createElement("th");
     th.textContent = col.label;
@@ -131,7 +131,7 @@ function formatSummaryValue(result, units, valueType) {
 
 async function renderSummaryTable() {
   const body = document.getElementById("summary-table-body");
-  const colCount = 2 + summaryRegionColumns.length;
+  const colCount = 3 + summaryRegionColumns.length;
   body.innerHTML = `<tr><td colspan="${colCount}">Computing&hellip;</td></tr>`;
   const rowsByCategory = {};
 
@@ -147,7 +147,9 @@ async function renderSummaryTable() {
           return computeWindowValue(data, region, summaryState.window, summaryState.year);
         });
         if (cells.every((cell) => cell === null)) continue;
-        (rowsByCategory[category] = rowsByCategory[category] || []).push({ product, response, cells });
+        (rowsByCategory[category] = rowsByCategory[category] || []).push({
+          product, response, cells, detrendMethod: entry.detrend_method,
+        });
       }
     }
   }
@@ -184,7 +186,8 @@ async function renderSummaryTable() {
       const responseCell = data.glossary
         ? `<td title="${data.glossary.replace(/"/g, "&quot;")}">${row.response}${note}</td>`
         : `<td>${row.response}${note}</td>`;
-      tr.innerHTML = `${responseCell}<td>${row.product}</td>${cellsHtml}`;
+      const detrendCell = `<td>${detrendBadgeHtml(row.detrendMethod)}</td>`;
+      tr.innerHTML = `${responseCell}<td>${row.product}</td>${detrendCell}${cellsHtml}`;
       body.appendChild(tr);
     });
   });
@@ -193,9 +196,7 @@ async function renderSummaryTable() {
   }
 }
 
-async function init() {
-  await loadManifest();
-  initSummaryTable();
-}
-
-init();
+// No self-invoking init here -- this now shares explore.html with
+// js/explore.js, which owns the single loadManifest() call and calls
+// initSummaryTable() itself (calling loadManifest() twice would double the
+// 342KB manifest fetch for no reason).

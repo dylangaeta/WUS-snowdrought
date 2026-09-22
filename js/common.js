@@ -1,6 +1,6 @@
-// Shared across all three pages (index.html, explore.html, maps.html): the
-// manifest fetch and the small set of constants/helpers every page needs.
-// No page-specific state lives here.
+// Shared across every page (index.html, explore.html, findings.html,
+// about.html): the manifest fetch and the small set of constants/helpers
+// every page needs. No page-specific state lives here.
 
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
@@ -27,7 +27,7 @@ const PRODUCT_OBSERVATION_KIND = {
   "GRACE-JPL-L3": "observation", "NLDAS-Mosaic": "model", "NLDAS-Noah": "model",
   "NLDAS-VIC": "model", "PRISM": "observation", "SiB4": "model",
   "UA-SWE-Monthly": "observation", "IMS-Snow": "observation", "SMAP": "observation",
-  "SNODAS": "model", "GlobSnow": "observation", "Rutgers-Snow": "observation",
+  "SNODAS": "model", "GlobSnow": "observation",
   "gridMET-Fire": "model", "MODIS-TerraAqua": "observation", "OCO-2": "observation",
   "PhenoCam": "observation", "SMOS": "observation", "CAMS": "model",
   "CarbonTracker": "model", "FluxSat": "model", "GOSIF": "model",
@@ -286,6 +286,42 @@ const DETREND_METHOD_LABELS = {
   mean_centered: "calendar-month mean removed, no trend",
   native_index: "already a standardized index",
 };
+const DETREND_BADGE_TEXT = {
+  ols: "OLS-detrended",
+  mean_centered: "Not detrended",
+  native_index: "Native index",
+};
+
+// A visible, color-coded badge -- not just text buried in a facts line --
+// for whether this response's anomaly had a real per-grid-cell trend
+// removed (ols), only a calendar-month mean subtracted (mean_centered, no
+// trend removed), or is already a standardized index where detrending
+// doesn't apply (native_index). Used everywhere a response is shown: the
+// product-meta line, the summary table, the map legend, and chart
+// legends/hover text.
+function detrendBadgeHtml(detrendMethod) {
+  if (!detrendMethod || !(detrendMethod in DETREND_BADGE_TEXT)) return "";
+  return `<span class="detrend-badge detrend-${detrendMethod}" title="${DETREND_METHOD_LABELS[detrendMethod]}">${DETREND_BADGE_TEXT[detrendMethod]}</span>`;
+}
+
+// Short parenthetical for chart legends/axis labels where a full badge
+// doesn't fit -- "(OLS)" / "(no trend)" / "(native idx)".
+const DETREND_SHORT_SUFFIX = { ols: "OLS", mean_centered: "no trend", native_index: "native idx" };
+function detrendShortSuffix(detrendMethod) {
+  return detrendMethod in DETREND_SHORT_SUFFIX ? ` (${DETREND_SHORT_SUFFIX[detrendMethod]})` : "";
+}
+
+// Looks up a response's manifest entry without needing to already know its
+// category -- category is only known up front where a page's own picker
+// state tracks it (js/explore.js's explorerState, js/map-viewer.js's
+// mapPickerState); chart code building traces across many products at once
+// (Compare variables, Heatmaps) only has product+response.
+function findResponseEntry(product, response) {
+  for (const products of Object.values(manifest.categories)) {
+    if (products[product] && products[product][response]) return products[product][response];
+  }
+  return null;
+}
 
 // Shared by explore.js and map-viewer.js's product-meta line -- a short
 // plain-language definition plus the same units/record/baseline/detrend
@@ -298,9 +334,8 @@ function productMetaHtml(entry) {
   const baseline = (entry.baseline_start_year && entry.baseline_end_year)
     ? `${entry.baseline_start_year}–${entry.baseline_end_year}`
     : "n/a";
-  const detrend = DETREND_METHOD_LABELS[entry.detrend_method] || "n/a";
   const glossaryLine = entry.glossary ? `<p class="product-glossary">${entry.glossary}</p>` : "";
-  return `${glossaryLine}<p class="product-facts">Units: ${entry.units || "n/a"} · Baseline: ${baseline} (${detrend}) · Record: ${recordRange} · Status: ${entry.status}</p>`;
+  return `${glossaryLine}<p class="product-facts">${detrendBadgeHtml(entry.detrend_method)} Units: ${entry.units || "n/a"} · Baseline: ${baseline} · Record: ${recordRange} · Status: ${entry.status}</p>`;
 }
 
 // Cross-page continuity for the Explore <-> Maps product picker: the last

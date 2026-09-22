@@ -1,10 +1,11 @@
-// "Explore the data" page: category tabs, product/response selection, and
-// three per-product views (static map / time series / seasonal cycle), plus
-// the cross-product heatmaps section below it. No science happens here --
-// every number is read straight from the JSON exported by
-// code/14_dashboard_export.py in the snowdrought-carbon repo. The interactive
-// COG map viewer lives on its own page (maps.html, js/map-viewer.js) with its
-// own product picker, not here.
+// "Explore the data" page: the regional summary table (js/summary.js) up
+// top, then category tabs, product/response selection, and three per-product
+// views (static map / time series / seasonal cycle), plus the cross-product
+// heatmaps section below it. No science happens here -- every number is read
+// straight from the JSON exported by code/14_dashboard_export.py in the
+// snowdrought-carbon repo. The interactive COG map viewer lives on the
+// homepage (index.html, js/map-viewer.js) with its own product picker, not
+// here.
 
 const explorerState = {
   category: null,
@@ -192,9 +193,10 @@ function renderActiveView() {
 }
 
 // The static per-product map picture is gone -- this embeds the real,
-// already-verified interactive COG map (maps.html) via the same URL-hash
-// view-sharing format js/map-viewer.js's copyViewLink() writes, rather than
-// duplicating its ~500 lines of OpenLayers setup for a second instance.
+// already-verified interactive COG map (index.html, the homepage) via the
+// same URL-hash view-sharing format js/map-viewer.js's copyViewLink()
+// writes, rather than duplicating its ~500 lines of OpenLayers setup for a
+// second instance.
 let mapIframeResizeObserver = null;
 
 function renderMap() {
@@ -202,8 +204,8 @@ function renderMap() {
     category: explorerState.category, product: explorerState.product, response: explorerState.response,
   });
   const iframe = document.getElementById("map-panel-iframe");
-  iframe.src = `maps.html?embed=1#${params.toString()}`;
-  document.getElementById("map-panel-open-link").href = `maps.html#${params.toString()}`;
+  iframe.src = `index.html?embed=1#${params.toString()}`;
+  document.getElementById("map-panel-open-link").href = `index.html#${params.toString()}`;
   // Same-origin iframe: size it to its own content's real height instead of
   // a fixed pixel guess, so it never grows its own internal scrollbar (the
   // content height varies with period -- DJFM's slider vs. the 3-button
@@ -211,7 +213,20 @@ function renderMap() {
   iframe.onload = () => {
     if (mapIframeResizeObserver) mapIframeResizeObserver.disconnect();
     const body = iframe.contentDocument.body;
-    const resize = () => { iframe.style.height = `${body.scrollHeight}px`; };
+    // Setting iframe.style.height changes the iframe's own viewport, which
+    // can make the map inside it (OpenLayers) redraw/re-tile and change
+    // body.scrollHeight again -- with nothing to stop it, that is an
+    // unbounded resize->redraw->resize loop with no browser-enforced
+    // ceiling on the CPU/memory it can consume. This guard makes resize()
+    // a no-op the instant the height stops changing, which makes a loop
+    // structurally impossible regardless of what the inner page does.
+    let lastHeight = 0;
+    const resize = () => {
+      const height = body.scrollHeight;
+      if (height === lastHeight) return;
+      lastHeight = height;
+      iframe.style.height = `${height}px`;
+    };
     resize();
     mapIframeResizeObserver = new ResizeObserver(resize);
     mapIframeResizeObserver.observe(body);
@@ -466,10 +481,11 @@ async function renderCustomOverlay() {
     const data = await fetchCompareSeries(`${product}_${response}`);
     const region = data.regions[compareState.region];
     if (!region) continue;
+    const detrendMethod = findResponseEntry(product, response)?.detrend_method;
     traces.push({
       x: region.dates, y: region.sigma, type: "scatter", mode: "lines",
       line: { color: COMPARE_COLORS[i], width: 1.8 },
-      name: `${product} ${response}`,
+      name: `${product} ${response}${detrendShortSuffix(detrendMethod)}`,
     });
   }
   Plotly.newPlot(chart, traces, plotlyLayout(), { responsive: true, displaylogo: false });
@@ -518,13 +534,14 @@ async function renderCategoryOverlay() {
     }
 
     const isObservation = PRODUCT_OBSERVATION_KIND[product] === "observation";
+    const detrendMethod = products[product][response].detrend_method;
     traces.push({
       x: region.dates, y: sigma, type: "scatter", mode: "lines", connectgaps: false,
       line: {
         color: CATEGORY_OVERLAY_COLORS[colorIndex % CATEGORY_OVERLAY_COLORS.length],
         width: 1.6, dash: isObservation ? "solid" : "dash",
       },
-      name: `${product} ${response}`,
+      name: `${product} ${response}${detrendShortSuffix(detrendMethod)}`,
     });
     colorIndex++;
   }
@@ -688,7 +705,8 @@ async function renderHeatmap() {
   for (const pair of pairs) {
     const row = await dataForRow(pair);
     if (row.every((v) => v === null)) continue;
-    yLabels.push(`${pair.product} ${pair.response}`);
+    const detrendMethod = findResponseEntry(pair.product, pair.response)?.detrend_method;
+    yLabels.push(`${pair.product} ${pair.response}${detrendShortSuffix(detrendMethod)}`);
     z.push(row);
   }
   if (z.length === 0) {
@@ -714,6 +732,7 @@ async function renderHeatmap() {
 
 async function init() {
   await loadManifest();
+  initSummaryTable();
   initExplorer();
   initCompareView();
   initHeatmaps();
