@@ -28,15 +28,29 @@ function parseSharedMapViewFromUrl() {
 let pendingSharedMapView = null;
 let lastMapSelection = null;
 
+// A URL fragment-only change (e.g. an embedding iframe's src updated to a
+// new #category=...&product=...&response=... on the same maps.html
+// document) does not reload the page or re-run init(), so it must be
+// re-applied explicitly via the hashchange event below -- confirmed missing
+// in real embedding testing, 2026-09.
+function applySharedMapView() {
+  const view = parseSharedMapViewFromUrl();
+  if (!view || !manifest.categories[view.category]) return false;
+  pendingSharedMapView = view;
+  selectMapCategory(view.category);
+  return true;
+}
+
 function initMapPicker() {
   renderMapCategoryTabs();
-  pendingSharedMapView = parseSharedMapViewFromUrl();
-  lastMapSelection = pendingSharedMapView ? null : loadLastSelection();
-  const preferredCategory = pendingSharedMapView?.category || lastMapSelection?.category;
-  const initialCategory = (preferredCategory && manifest.categories[preferredCategory])
-    ? preferredCategory
-    : manifest.category_order.find((cat) => Object.keys(manifest.categories[cat]).length > 0);
-  selectMapCategory(initialCategory);
+  if (!applySharedMapView()) {
+    lastMapSelection = loadLastSelection();
+    const preferredCategory = lastMapSelection?.category;
+    const initialCategory = (preferredCategory && manifest.categories[preferredCategory])
+      ? preferredCategory
+      : manifest.category_order.find((cat) => Object.keys(manifest.categories[cat]).length > 0);
+    selectMapCategory(initialCategory);
+  }
 
   document.getElementById("product-select").addEventListener("change", (event) => {
     mapPickerState.product = event.target.value;
@@ -50,6 +64,7 @@ function initMapPicker() {
     pendingSharedMapView = { category, product, response };
     selectMapCategory(category);
   });
+  window.addEventListener("hashchange", applySharedMapView);
 }
 
 function renderMapCategoryTabs() {
@@ -135,6 +150,7 @@ const olMapState = {
   boundaryLayer: null,
   period: null,
   year: "baseline",
+  lastAnomalyYear: null, // remembered so the Climatology button can toggle back to it
   styleCache: {},
   currentStyle: null,
   currentCogUrl: null,
@@ -169,6 +185,17 @@ function buildBinnedColorExpression(boundaries, colors, scale) {
   }
   expr.push(colors[colors.length - 1]);
   return expr;
+}
+
+// Smallest number of decimal places at which every boundary in a
+// BoundaryNorm scale formats to a distinct string -- e.g. [-0.11, -0.09,
+// ...] needs 2 decimals (1 decimal collapses both to "-0.1").
+function pickTickDecimals(boundaries) {
+  for (let d = 0; d <= 6; d++) {
+    const formatted = boundaries.map((v) => v.toFixed(d));
+    if (new Set(formatted).size === formatted.length) return d;
+  }
+  return 6;
 }
 
 function olPeriodLabel(period) {
@@ -230,7 +257,14 @@ function initInteractiveMap() {
     updateInteractiveMapLayer();
   });
   document.getElementById("ol-year-slider-baseline").addEventListener("click", () => {
-    olMapState.year = "baseline";
+    // Toggle: clicking Climatology while already on it restores whichever
+    // anomaly year was showing before, instead of being a dead-end click.
+    if (olMapState.year === "baseline") {
+      if (olMapState.lastAnomalyYear !== null) olMapState.year = olMapState.lastAnomalyYear;
+    } else {
+      olMapState.lastAnomalyYear = olMapState.year;
+      olMapState.year = "baseline";
+    }
     updateInteractiveMapLayer();
   });
   document.getElementById("ol-boundary-toggle").addEventListener("change", (event) => {
@@ -371,15 +405,23 @@ async function updateInteractiveMapLayer() {
   const boundaries = fileEntry.boundaries;
   if (boundaries) {
     const nBins = boundaries.length - 1;
-    // Labeling every boundary crowds a narrow legend; show the two
-    // endpoints and alternating boundaries in between, always including a
-    // readable "0" tick when one of the boundaries is exactly the sign
-    // crossing (true for every diverging anomaly scale here).
+    // Every bin boundary gets its own tick -- these are discrete
+    // BoundaryNorm bins (matching the pipeline's own static maps), not a
+    // continuous colorbar, so skipping a boundary hides a real category
+    // edge. Fixed 1-decimal formatting made adjacent boundaries render as
+    // duplicate-looking labels (e.g. -0.11 and -0.09 both "-0.1"); instead
+    // pick the fewest decimals that keep every boundary distinguishable.
+    const decimals = pickTickDecimals(boundaries);
+    // Adjacent boundaries are only 34px (one swatch) apart, too narrow for
+    // most label text, so alternate labels onto a second row -- doubles the
+    // effective horizontal spacing to 68px without touching swatch width.
+    const tickRowClass = (boundaryIndex) => (boundaryIndex % 2 === 0 ? "" : " ol-legend-tick-row2");
     const swatches = Array.from({ length: nBins }, (_, i) => {
-      const showLeftTick = i === 0 || i % 2 === 0;
-      const leftTick = showLeftTick ? `<span class="ol-legend-tick">${boundaries[i].toFixed(1)}</span>` : "";
-      const rightTick = i === nBins - 1 ? `<span class="ol-legend-tick ol-legend-tick-last">${boundaries[i + 1].toFixed(1)}</span>` : "";
-      return `<span class="ol-legend-swatch" style="background:${palette[i]}" title="${boundaries[i].toFixed(1)} to ${boundaries[i + 1].toFixed(1)}">${leftTick}${rightTick}</span>`;
+      const leftTick = `<span class="ol-legend-tick${tickRowClass(i)}">${boundaries[i].toFixed(decimals)}</span>`;
+      const rightTick = i === nBins - 1
+        ? `<span class="ol-legend-tick ol-legend-tick-last${tickRowClass(nBins)}">${boundaries[i + 1].toFixed(decimals)}</span>`
+        : "";
+      return `<span class="ol-legend-swatch" style="background:${palette[i]}" title="${boundaries[i].toFixed(decimals)} to ${boundaries[i + 1].toFixed(decimals)}">${leftTick}${rightTick}</span>`;
     }).join("");
     legend.innerHTML = `<div class="ol-legend-label">${label}</div><div class="ol-legend-scale">${swatches}</div>`;
   } else {
@@ -498,6 +540,12 @@ function copyViewLink() {
 }
 
 async function init() {
+  // ?embed=1 (set by js/explore.js's renderMap() iframe) hides the page
+  // chrome duplicated from whichever page is embedding this map -- the
+  // interactive map itself is otherwise identical, same URL-hash state.
+  if (new URLSearchParams(window.location.search).get("embed") === "1") {
+    document.body.classList.add("embedded");
+  }
   await loadManifest();
   initMapPicker();
 }

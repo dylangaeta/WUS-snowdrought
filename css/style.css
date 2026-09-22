@@ -83,6 +83,11 @@ a:hover { color: var(--navy); }
   color: #fff;
   text-decoration: none;
 }
+/* Wraps the wordmark link in a real <h1> for accessibility (every page was
+   missing a level-one heading) without affecting layout at all -- the h1's
+   own box is removed from the flow, so header-inner's flex layout treats
+   the <a> inside it exactly as before. */
+.wordmark-h1 { display: contents; }
 .beta-tag {
   display: inline-block;
   vertical-align: middle;
@@ -363,8 +368,22 @@ table.headline-table td.window-growing { background: #fbe2ec; color: #7a1240; fo
   padding: 0.75rem;
 }
 .map-image-wrap img { max-width: 100%; height: auto; border-radius: var(--radius-sm); }
+.embedded-map-note { font-size: 0.9rem; color: var(--text-muted); margin-bottom: 0.5rem; }
+body.embedded .site-header, body.embedded .attribution-bar { display: none; }
+body.embedded main { padding-top: 1rem; }
+.embedded-map-iframe {
+  width: 100%;
+  height: 600px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
 .finding-card h3 { margin-top: 0; }
 .finding-note { color: var(--text-muted); font-size: 0.9rem; margin-top: 0.6rem; margin-bottom: 0; }
+/* Matches code/11_context_SnowDroughtQuadrants_analyze.py's own
+   figsize=(12.0, 10.2) -- that script never calls set_aspect('equal'), so
+   this is the source figure's actual proportions, not a forced square. */
+#quadrant-chart { max-width: 720px; aspect-ratio: 12 / 10.2; margin: 0 auto; }
 .map-empty, .chart-empty { color: var(--text-muted); font-style: italic; padding: 2rem; text-align: center; }
 
 .boundary-toggle { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.9rem; color: var(--text-muted); cursor: pointer; }
@@ -409,8 +428,8 @@ table.headline-table td.window-growing { background: #fbe2ec; color: #7a1240; fo
   display: flex;
   /* tick labels below are position:absolute and don't add to this row's own
      height, so this margin is the only thing keeping later content from
-     overlapping them */
-  margin-bottom: 1.5rem;
+     overlapping them -- tall enough for the two staggered label rows below */
+  margin-bottom: 2.4rem;
 }
 .ol-legend-swatch { position: relative; display: inline-block; width: 34px; height: 16px; flex-shrink: 0; }
 .ol-legend-tick {
@@ -423,6 +442,10 @@ table.headline-table td.window-growing { background: #fbe2ec; color: #7a1240; fo
   white-space: nowrap;
   color: var(--text-muted);
 }
+/* Every boundary is labeled, but adjacent boundaries are only 34px apart --
+   staggering alternating labels onto a second row doubles their effective
+   horizontal clearance to 68px so the text never overlaps. */
+.ol-legend-tick-row2 { margin-top: 22px; }
 .ol-legend-tick-last { left: 100%; }
 #ol-query-readout { margin-top: 0.6rem; font-size: 0.9rem; color: var(--text); min-height: 1.2em; }
 .ol-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 0.8rem; }

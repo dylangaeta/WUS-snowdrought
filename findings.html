@@ -3,19 +3,22 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Key findings from the Western US snow drought explorer: observational coverage, cross-product anomaly patterns, and Dierauer snow-drought classification for the 2025-2026 winter.">
 <title>Key Findings &mdash; 2025-2026 Western US Snow Drought Explorer</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg stroke='%23162e51' stroke-width='2' stroke-linecap='round'%3E%3Cline x1='12' y1='2' x2='12' y2='22'/%3E%3Cline x1='4' y1='6' x2='20' y2='18'/%3E%3Cline x1='4' y1='18' x2='20' y2='6'/%3E%3C/g%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@400;600;700&family=Merriweather:wght@700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
 </head>
 <body>
 
 <header class="site-header">
   <div class="header-inner">
-    <a class="wordmark" href="index.html">Western US Winter &amp; Snow Drought Explorer <span class="beta-tag">BETA</span>
+    <h1 class="wordmark-h1"><a class="wordmark" href="index.html">Western US Winter &amp; Snow Drought Explorer <span class="beta-tag">BETA</span>
       <small>NOAA Global Monitoring Laboratory &middot; Cooperative Institute for Research in Environmental Sciences</small>
-      <small>Unofficial snow drought dashboard and data explorer</small>
-    </a>
+      <small>Unofficial snow drought dashboard and data explorer. For educational purposes only</small>
+    </a></h1>
     <nav class="site-nav">
       <a href="index.html">Home</a>
       <a href="findings.html" class="active">Key Findings</a>
@@ -24,24 +27,67 @@
       <a href="about.html">About</a>
     </nav>
   </div>
+  <div class="attribution-bar">
+    Not an official NOAA or NIDIS product. Descriptive analysis only &mdash; no forecasts, no causal claims, no year-against-year comparison.
+  </div>
 </header>
-<div class="attribution-bar">
-  Not an official NOAA or NIDIS product. Descriptive analysis only &mdash; no forecasts, no causal claims, no year-against-year comparison.
-</div>
 
 <main>
 
   <section id="key-findings">
     <h2>Key findings</h2>
     <p>
-      The pipeline's own curated figure set, each one answering a specific
+      Every chart on this dashboard, this page included, answers a specific
       question about how 2025-2026 conditions departed from the fixed
       calendar-month climatology (see <a href="about.html">About</a> for the
-      full methodology). Every value here is descriptive: a single year (or
-      month) compared against its own baseline, never against another year.
+      full methodology) &mdash; computed live from the same JSON every other
+      page uses, not a static image. Every value here is descriptive: a
+      single year (or month) compared against its own baseline, never
+      against another year.
     </p>
-    <div id="findings-list"></div>
-    <div id="findings-empty" class="chart-empty" style="display:none;">Key findings are not available yet.</div>
+    <p>
+      How anomalous was 2025-2026 across the snow, water, and vegetation
+      observing systems, product by product? That's the "By category" view
+      on <a href="explore.html#compare">Compare variables</a> &mdash; every
+      product in a theme overlaid on one standardized-anomaly axis,
+      observations solid / models dashed. How did physical anomalies emerge
+      through the year, across every product at once? That's the
+      <a href="explore.html#heatmaps">Heatmaps</a> section, same page.
+    </p>
+  </section>
+
+  <section id="observational-coverage">
+    <div class="panel finding-card">
+      <h3>Which observing systems reach the live 2026 growing season, and with what latency?</h3>
+      <p>Actual local temporal coverage for every product in the pipeline,
+        colored by category. Bar length is real record coverage, not an
+        estimate -- computed directly from this dashboard's own manifest.</p>
+      <div id="coverage-chart"></div>
+      <p class="finding-note">Gaps in an individual product's own record are not shown here (see that product's own page for its actual monthly coverage) -- this view is about which products reach which dates at all.</p>
+    </div>
+  </section>
+
+  <section id="snow-drought-classification">
+    <div class="panel finding-card">
+      <h3>How did each DJFM winter classify by snow-drought type?</h3>
+      <p>
+        Dierauer, Allen &amp; Whitfield (2019, <em>Water Resources
+        Research</em>) split below-normal snowpack winters by their
+        precipitation and temperature departure into dry, warm-and-dry, and
+        warm snow droughts. Each point is one DJFM winter (1991&ndash;2026),
+        placed by its own anomaly relative to the fixed baseline &mdash; pick
+        any two drivers to see how they relate; the color always reflects the
+        Dierauer classification itself (temperature &times; precipitation
+        &times; snowpack), not the two axes shown.
+      </p>
+      <div class="selector-row">
+        <select id="quadrant-region-select" aria-label="Region"></select>
+        <select id="quadrant-x-select" aria-label="X axis"></select>
+        <select id="quadrant-y-select" aria-label="Y axis"></select>
+      </div>
+      <div id="quadrant-chart"></div>
+      <p class="finding-note">Descriptive only -- no product is combined with another. Source: code/11_context_SnowDroughtQuadrants_analyze.py's own classification table.</p>
+    </div>
   </section>
 
 </main>

@@ -12,8 +12,6 @@ const explorerState = {
   response: null,
   region: "ALL",
   view: "map",
-  mapPeriod: null,
-  mapYear: "baseline",
   timeseriesSeries: "value",
   seasonalSeries: "raw",
   seriesCache: {},
@@ -44,6 +42,7 @@ let lastSelection = null;
 
 function initExplorer() {
   if (!document.getElementById("category-tabs")) return;
+  populateRegionToggle(document.getElementById("region-toggle"), explorerState.region);
   renderCategoryTabs();
   pendingSharedView = parseSharedViewFromUrl();
   lastSelection = pendingSharedView ? null : loadLastSelection();
@@ -141,7 +140,6 @@ function onSelectionChanged() {
   const entry = currentResponseEntry();
   document.getElementById("product-meta").innerHTML = productMetaHtml(entry);
   saveLastSelection(explorerState.category, explorerState.product, explorerState.response);
-  explorerState.mapPeriod = null;
   renderActiveView();
 }
 
@@ -171,17 +169,6 @@ function wireExplorerControls() {
     });
     renderActiveView();
   });
-  document.getElementById("map-period-select").addEventListener("change", (event) => {
-    explorerState.mapPeriod = event.target.value;
-    renderMap();
-  });
-  document.getElementById("map-year-toggle").addEventListener("click", (event) => {
-    const button = event.target.closest("button[data-year]");
-    if (!button || button.disabled) return;
-    explorerState.mapYear = button.dataset.year;
-    document.querySelectorAll("#map-year-toggle button").forEach((btn) => btn.classList.toggle("active", btn === button));
-    renderMap();
-  });
   document.getElementById("timeseries-toggle").addEventListener("click", (event) => {
     const button = event.target.closest("button[data-series]");
     if (!button) return;
@@ -204,52 +191,16 @@ function renderActiveView() {
   else renderSeasonal();
 }
 
+// The static per-product map picture is gone -- this embeds the real,
+// already-verified interactive COG map (maps.html) via the same URL-hash
+// view-sharing format js/map-viewer.js's copyViewLink() writes, rather than
+// duplicating its ~500 lines of OpenLayers setup for a second instance.
 function renderMap() {
-  const entry = currentResponseEntry();
-  const periods = sortedPeriods(Object.keys(entry.maps || {}));
-  const select = document.getElementById("map-period-select");
-  const wrap = document.getElementById("map-image-wrap");
-
-  if (periods.length === 0) {
-    select.innerHTML = "";
-    wrap.innerHTML = '<p class="map-empty">No spatial maps for this dataset (site-network product).</p>';
-    return;
-  }
-  if (!explorerState.mapPeriod || !periods.includes(explorerState.mapPeriod)) {
-    explorerState.mapPeriod = periods.includes("DJFM") ? "DJFM" : periods[0];
-  }
-  select.innerHTML = "";
-  periods.forEach((period) => {
-    const option = document.createElement("option");
-    option.value = period;
-    option.textContent = periodLabel(period);
-    select.appendChild(option);
+  const params = new URLSearchParams({
+    category: explorerState.category, product: explorerState.product, response: explorerState.response,
   });
-  select.value = explorerState.mapPeriod;
-
-  const slot = entry.maps[explorerState.mapPeriod];
-  const yearButtons = document.querySelectorAll("#map-year-toggle button");
-  yearButtons.forEach((btn) => {
-    const key = btn.dataset.year === "baseline" ? "baseline" : `anomaly_${btn.dataset.year}`;
-    const available = Boolean(slot[key]);
-    btn.disabled = !available;
-    btn.style.opacity = available ? "1" : "0.4";
-  });
-  if (!slot[explorerState.mapYear === "baseline" ? "baseline" : `anomaly_${explorerState.mapYear}`]) {
-    const firstAvailable = ["baseline", "2026", "2025"].find(
-      (year) => slot[year === "baseline" ? "baseline" : `anomaly_${year}`]
-    );
-    explorerState.mapYear = firstAvailable || "baseline";
-  }
-  yearButtons.forEach((btn) => btn.classList.toggle("active", btn.dataset.year === explorerState.mapYear));
-
-  const key = explorerState.mapYear === "baseline" ? "baseline" : `anomaly_${explorerState.mapYear}`;
-  const relpath = slot[key];
-  if (!relpath) {
-    wrap.innerHTML = '<p class="map-empty">No map available for this selection.</p>';
-    return;
-  }
-  wrap.innerHTML = `<img src="${assetUrl(`figures/maps/${relpath}`)}" alt="${explorerState.product} ${explorerState.response} ${periodLabel(explorerState.mapPeriod)} map">`;
+  document.getElementById("map-panel-iframe").src = `maps.html?embed=1#${params.toString()}`;
+  document.getElementById("map-panel-open-link").href = `maps.html#${params.toString()}`;
 }
 
 async function fetchSeries(kind) {
@@ -339,18 +290,75 @@ async function renderSeasonal() {
 
 // ------------------------------------------------------------------ Compare
 //
-// Overlays up to 3 variables' already-computed standardized anomalies (the
-// same `region.sigma` series js/explore.js's own renderTimeseries() plots)
-// on one shared axis. Sigma removes each variable's own physical units, so
-// this is a direct, purely-descriptive overlay -- no new statistic, no
-// interpretation of what the co-movement means.
+// Two modes, both overlaying already-computed standardized anomalies (sigma
+// removes each variable's own physical units) on one shared axis -- no new
+// statistic, no interpretation of what the co-movement means.
+//
+// "category" mode reproduces code/11_combined_GroupOverlays_analyze.py's
+// canonical multi-product overlay dynamically instead of as a static PNG:
+// every product/response the manifest already groups under one category
+// (manifest.categories[category], the same figure_category() grouping the
+// Python script's COMBINED_GROUPS is built from), styled solid
+// (observation) / dashed (model) per PRODUCT_OBSERVATION_KIND, sign-negated
+// per COMBINED_INVERTED_VALENCE_RESPONSES, and -- for vegetation -- limited
+// to each product's own growing-season months via
+// COMBINED_GROWING_SEASON_MIN_AMPLITUDE_FRACTION so a near-zero dormant-
+// season baseline spread doesn't explode the standardized value. All three
+// constants mirror 00_config.py exactly (see js/common.js).
+//
+// "custom" mode is the original pick-up-to-3 overlay for open-ended
+// exploration outside the canonical groupings.
 
-const compareState = { region: "ALL", selections: [null, null, null], cache: {} };
+const compareState = {
+  mode: "category",
+  region: "ALL",
+  category: null,
+  selections: [null, null, null],
+  cache: {},
+  seasonalCache: {},
+};
 const COMPARE_COLORS = ["#205493", "#a0290f", "#2e8540"];
+const CATEGORY_OVERLAY_COLORS = [
+  "#205493", "#a0290f", "#2e8540", "#946e00", "#5c3d99",
+  "#00767a", "#b5390c", "#3a6b8a", "#8a3a6b", "#556b2f",
+  "#a0522d", "#4b5320",
+];
+
+function setCompareMode(mode) {
+  compareState.mode = mode;
+  document.querySelectorAll("#compare-mode-toggle button").forEach((b) => b.classList.toggle("active", b.dataset.mode === mode));
+  document.getElementById("compare-custom-row").style.display = mode === "custom" ? "" : "none";
+  document.getElementById("compare-category-row").style.display = mode === "category" ? "" : "none";
+  document.getElementById("compare-category-note").style.display = mode === "category" ? "" : "none";
+}
 
 function initCompareView() {
+  const chart = document.getElementById("compare-chart");
+  if (!chart) return;
+
+  populateRegionSelect(document.getElementById("compare-region-select"), compareState.region);
+
+  document.getElementById("compare-mode-toggle").addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-mode]");
+    if (!button) return;
+    setCompareMode(button.dataset.mode);
+    renderCompareChart();
+  });
+
+  const categorySelect = document.getElementById("compare-category-select");
+  manifest.category_order.forEach((cat) => {
+    const option = document.createElement("option");
+    option.value = cat;
+    option.textContent = manifest.category_labels[cat];
+    categorySelect.appendChild(option);
+  });
+  compareState.category = manifest.category_order[0];
+  categorySelect.addEventListener("change", (event) => {
+    compareState.category = event.target.value;
+    renderCompareChart();
+  });
+
   const selects = [0, 1, 2].map((i) => document.getElementById(`compare-select-${i}`));
-  if (!selects[0]) return;
   const index = buildSearchIndex();
   selects.forEach((select, i) => {
     const noneOption = document.createElement("option");
@@ -368,16 +376,30 @@ function initCompareView() {
       renderCompareChart();
     });
   });
+
+  document.getElementById("compare-preset-snowdrought").addEventListener("click", () => {
+    setCompareMode("custom");
+    const findFirst = (matchFn) => index.find(matchFn);
+    const picks = [
+      findFirst((it) => it.response === "MONTHLY_SWE"),
+      findFirst((it) => it.product === "PRISM" && it.response === "PPT"),
+      findFirst((it) => it.product === "ERA5-Land" && it.response === "T2m"),
+    ].filter(Boolean);
+    picks.forEach((item, i) => {
+      if (!selects[i]) return;
+      selects[i].value = `${item.product}|${item.response}`;
+      compareState.selections[i] = selects[i].value;
+    });
+    renderCompareChart();
+  });
+
   document.getElementById("compare-region-select").addEventListener("change", (event) => {
     compareState.region = event.target.value;
     renderCompareChart();
   });
-  // Seed the first picker so the chart isn't empty on first load.
-  if (index.length > 0) {
-    selects[0].value = `${index[0].product}|${index[0].response}`;
-    compareState.selections[0] = selects[0].value;
-    renderCompareChart();
-  }
+
+  setCompareMode("category");
+  renderCompareChart();
 }
 
 async function fetchCompareSeries(key) {
@@ -388,7 +410,33 @@ async function fetchCompareSeries(key) {
   return compareState.cache[key];
 }
 
+async function fetchCompareSeasonal(key) {
+  if (!(key in compareState.seasonalCache)) {
+    const res = await fetch(`data/seasonal/${key}.json`);
+    compareState.seasonalCache[key] = res.ok ? await res.json() : null;
+  }
+  return compareState.seasonalCache[key];
+}
+
+function plotlyLayout() {
+  return {
+    margin: { t: 20, r: 20, b: 45, l: 60 },
+    yaxis: { title: "Standardized anomaly (σ)", zeroline: true },
+    xaxis: { title: "Year" },
+    font: { family: "Source Sans Pro, sans-serif", size: 13 },
+    shapes: [{ type: "line", x0: 0, x1: 1, xref: "paper", y0: 0, y1: 0, line: { color: "#888", width: 1 } }],
+  };
+}
+
 async function renderCompareChart() {
+  if (compareState.mode === "category") {
+    await renderCategoryOverlay();
+  } else {
+    await renderCustomOverlay();
+  }
+}
+
+async function renderCustomOverlay() {
   const chart = document.getElementById("compare-chart");
   const active = compareState.selections.filter(Boolean);
   if (active.length === 0) {
@@ -409,53 +457,99 @@ async function renderCompareChart() {
       name: `${product} ${response}`,
     });
   }
-  const layout = {
-    margin: { t: 20, r: 20, b: 45, l: 60 },
-    yaxis: { title: "Standardized anomaly (σ)", zeroline: true },
-    xaxis: { title: "Year" },
-    font: { family: "Source Sans Pro, sans-serif", size: 13 },
-    shapes: [{ type: "line", x0: 0, x1: 1, xref: "paper", y0: 0, y1: 0, line: { color: "#888", width: 1 } }],
-  };
-  Plotly.newPlot(chart, traces, layout, { responsive: true, displaylogo: false });
+  Plotly.newPlot(chart, traces, plotlyLayout(), { responsive: true, displaylogo: false });
+}
+
+async function renderCategoryOverlay() {
+  const chart = document.getElementById("compare-chart");
+  const note = document.getElementById("compare-category-note");
+  const category = compareState.category;
+  const products = manifest.categories[category] || {};
+  const pairs = [];
+  for (const [product, responses] of Object.entries(products)) {
+    for (const response of Object.keys(responses)) pairs.push({ product, response });
+  }
+  if (pairs.length === 0) {
+    chart.innerHTML = '<p class="chart-empty">No products in this category.</p>';
+    return;
+  }
+  note.textContent = "Solid = observation, dashed = model -- the same grouping and styling as the pipeline's own combined-overlay figures.";
+
+  const traces = [];
+  let colorIndex = 0;
+  for (const { product, response } of pairs) {
+    const key = `${product}_${response}`;
+    const data = await fetchCompareSeries(key);
+    const region = data.regions[compareState.region];
+    if (!region) continue;
+
+    let sigma = region.sigma;
+    if (category === "vegetation") {
+      const seasonal = await fetchCompareSeasonal(key);
+      const seasonalRegion = seasonal && seasonal.regions[compareState.region];
+      if (seasonalRegion) {
+        const mean = seasonalRegion.climatology_mean;
+        const trough = Math.min(...mean);
+        const amplitude = Math.max(...mean) - trough;
+        const keepMonth = mean.map((v) => (v - trough) > COMBINED_GROWING_SEASON_MIN_AMPLITUDE_FRACTION * amplitude);
+        sigma = region.dates.map((d, i) => {
+          const month = parseInt(d.slice(5, 7), 10);
+          return keepMonth[month - 1] ? sigma[i] : null;
+        });
+      }
+    }
+    if (COMBINED_INVERTED_VALENCE_RESPONSES.has(response)) {
+      sigma = sigma.map((v) => (v === null || v === undefined ? null : -v));
+    }
+
+    const isObservation = PRODUCT_OBSERVATION_KIND[product] === "observation";
+    traces.push({
+      x: region.dates, y: sigma, type: "scatter", mode: "lines", connectgaps: false,
+      line: {
+        color: CATEGORY_OVERLAY_COLORS[colorIndex % CATEGORY_OVERLAY_COLORS.length],
+        width: 1.6, dash: isObservation ? "solid" : "dash",
+      },
+      name: `${product} ${response}`,
+    });
+    colorIndex++;
+  }
+  Plotly.newPlot(chart, traces, plotlyLayout(), { responsive: true, displaylogo: false });
 }
 
 // ---------------------------------------------------------------- Heatmaps
+//
+// Product x time standardized-anomaly matrix, computed dynamically from the
+// same data every other chart on this page uses -- not a static image. Two
+// families: "monthly" (direct per-month sigma, the most recent 12 months
+// available) and "ndjf_winter" (each winter's NDJF sigma via the same
+// window-aggregation + non-parametric standardization used by the homepage
+// summary table -- see computeWindowValue() in js/common.js).
 
-const heatmapState = {
-  family: null,
-  category: "all",
-  threshold: "all",
+const HEATMAP_FAMILIES = {
+  monthly: { label: "Monthly anomalies (most recent 12 months)" },
+  ndjf_winter: { label: "NDJF winter anomalies (1999–2026)" },
 };
+
+const heatmapState = { family: "monthly", category: "all", region: "ALL", cache: {} };
 
 function initHeatmaps() {
   const familySelect = document.getElementById("heatmap-family-select");
   if (!familySelect) return;
-  const families = Object.keys(manifest.heatmaps);
-  if (families.length === 0) {
-    document.getElementById("heatmap-image-wrap").innerHTML = '<p class="map-empty">No heatmaps available yet.</p>';
-    return;
-  }
-  families.forEach((family) => {
+  populateRegionSelect(document.getElementById("heatmap-region-select"), heatmapState.region);
+  Object.entries(HEATMAP_FAMILIES).forEach(([key, family]) => {
     const option = document.createElement("option");
-    option.value = family;
-    option.textContent = manifest.heatmaps[family].label;
+    option.value = key;
+    option.textContent = family.label;
     familySelect.appendChild(option);
   });
-  heatmapState.family = families[0];
   familySelect.value = heatmapState.family;
   familySelect.addEventListener("change", (event) => {
     heatmapState.family = event.target.value;
-    heatmapState.category = "all";
-    heatmapState.threshold = "all";
-    renderHeatmapCategoryTabs();
     renderHeatmap();
   });
 
-  document.getElementById("heatmap-threshold-toggle").addEventListener("click", (event) => {
-    const button = event.target.closest("button[data-threshold]");
-    if (!button || button.disabled) return;
-    heatmapState.threshold = button.dataset.threshold;
-    document.querySelectorAll("#heatmap-threshold-toggle button").forEach((btn) => btn.classList.toggle("active", btn === button));
+  document.getElementById("heatmap-region-select").addEventListener("change", (event) => {
+    heatmapState.region = event.target.value;
     renderHeatmap();
   });
 
@@ -466,17 +560,14 @@ function initHeatmaps() {
 function renderHeatmapCategoryTabs() {
   const nav = document.getElementById("heatmap-category-tabs");
   nav.innerHTML = "";
-  const familyCategories = manifest.heatmaps[heatmapState.family].categories;
-
   const allButton = document.createElement("button");
-  allButton.className = "category-tab";
+  allButton.className = "category-tab active";
   allButton.textContent = "All products";
   allButton.dataset.category = "all";
   allButton.addEventListener("click", () => selectHeatmapCategory("all"));
   nav.appendChild(allButton);
 
   manifest.category_order.forEach((category) => {
-    if (!familyCategories[category]) return;
     const button = document.createElement("button");
     button.className = "category-tab";
     button.textContent = manifest.category_labels[category];
@@ -485,41 +576,125 @@ function renderHeatmapCategoryTabs() {
     button.addEventListener("click", () => selectHeatmapCategory(category));
     nav.appendChild(button);
   });
-  markActiveHeatmapCategory();
 }
 
 function selectHeatmapCategory(category) {
   heatmapState.category = category;
-  markActiveHeatmapCategory();
+  document.querySelectorAll("#heatmap-category-tabs .category-tab").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.category === category);
+  });
   renderHeatmap();
 }
 
-function markActiveHeatmapCategory() {
-  document.querySelectorAll("#heatmap-category-tabs .category-tab").forEach((btn) => {
-    btn.classList.toggle("active", btn.dataset.category === heatmapState.category);
-  });
+async function fetchHeatmapSeries(key) {
+  if (!heatmapState.cache[key]) {
+    const res = await fetch(`data/timeseries/${key}.json`);
+    heatmapState.cache[key] = await res.json();
+  }
+  return heatmapState.cache[key];
 }
 
-function renderHeatmap() {
-  const family = manifest.heatmaps[heatmapState.family];
-  const categorySlots = family.categories[heatmapState.category] || {};
-  const hasThresholds = Object.keys(categorySlots).some((key) => key !== "all");
-  document.getElementById("heatmap-threshold-toggle").style.display = hasThresholds ? "inline-flex" : "none";
-  if (!hasThresholds) heatmapState.threshold = "all";
-  document.querySelectorAll("#heatmap-threshold-toggle button").forEach((btn) => {
-    const available = Boolean(categorySlots[btn.dataset.threshold]);
-    btn.disabled = !available;
-    btn.style.opacity = available ? "1" : "0.4";
-    btn.classList.toggle("active", btn.dataset.threshold === heatmapState.threshold);
+function heatmapPairs(category) {
+  const pairs = [];
+  const cats = category === "all" ? manifest.category_order : [category];
+  cats.forEach((cat) => {
+    const products = manifest.categories[cat] || {};
+    for (const [product, responses] of Object.entries(products)) {
+      for (const response of Object.keys(responses)) pairs.push({ product, response });
+    }
   });
+  return pairs;
+}
 
-  const wrap = document.getElementById("heatmap-image-wrap");
-  const filename = categorySlots[heatmapState.threshold];
-  if (!filename) {
-    wrap.innerHTML = '<p class="map-empty">No heatmap available for this selection.</p>';
+// Every product's own record_end differs; derive the shared 12-month window
+// from whichever record extends furthest, rather than a hardcoded date.
+function latestRecordEndMonth() {
+  let latest = null;
+  for (const products of Object.values(manifest.categories)) {
+    for (const responses of Object.values(products)) {
+      for (const entry of Object.values(responses)) {
+        if (entry.record_end && (!latest || entry.record_end > latest)) latest = entry.record_end;
+      }
+    }
+  }
+  return latest; // "YYYY-MM-DD"
+}
+
+async function renderHeatmap() {
+  const chart = document.getElementById("heatmap-chart");
+  const pairs = heatmapPairs(heatmapState.category);
+  if (pairs.length === 0) {
+    chart.innerHTML = '<p class="chart-empty">No products in this category.</p>';
     return;
   }
-  wrap.innerHTML = `<img src="figures/heatmaps/${filename}" alt="${family.label} heatmap">`;
+  chart.innerHTML = '<p class="chart-empty">Computing…</p>';
+
+  let xLabels, z, dataForRow;
+  if (heatmapState.family === "monthly") {
+    const endDate = latestRecordEndMonth();
+    const endYear = parseInt(endDate.slice(0, 4), 10);
+    const endMonth = parseInt(endDate.slice(5, 7), 10);
+    const months = [];
+    for (let i = 11; i >= 0; i--) {
+      let m = endMonth - i, y = endYear;
+      if (m <= 0) { m += 12; y -= 1; }
+      months.push({ year: y, month: m });
+    }
+    xLabels = months.map(({ year, month }) => `${MONTH_NAMES[month - 1].slice(0, 3)} ${year}`);
+    dataForRow = async ({ product, response }) => {
+      const data = await fetchHeatmapSeries(`${product}_${response}`);
+      const region = data.regions[heatmapState.region];
+      if (!region) return months.map(() => null);
+      return months.map(({ year, month }) => {
+        const dateStr = `${year}-${String(month).padStart(2, "0")}-01`;
+        const idx = region.dates.indexOf(dateStr);
+        return idx === -1 ? null : region.sigma[idx];
+      });
+    };
+  } else {
+    const endDate = latestRecordEndMonth();
+    const endYear = parseInt(endDate.slice(0, 4), 10);
+    const years = [];
+    for (let y = 1999; y <= endYear; y++) years.push(y);
+    xLabels = years.map(String);
+    dataForRow = async ({ product, response }) => {
+      const data = await fetchHeatmapSeries(`${product}_${response}`);
+      const region = data.regions[heatmapState.region];
+      if (!region) return years.map(() => null);
+      return years.map((year) => {
+        const result = computeWindowValue(data, region, "NDJF", year);
+        return result ? result.sigma : null;
+      });
+    };
+  }
+
+  const yLabels = [];
+  z = [];
+  for (const pair of pairs) {
+    const row = await dataForRow(pair);
+    if (row.every((v) => v === null)) continue;
+    yLabels.push(`${pair.product} ${pair.response}`);
+    z.push(row);
+  }
+  if (z.length === 0) {
+    chart.innerHTML = '<p class="chart-empty">No data for this selection.</p>';
+    return;
+  }
+
+  const trace = {
+    x: xLabels, y: yLabels, z, type: "heatmap",
+    colorscale: "RdBu", reversescale: true, zmid: 0,
+    colorbar: { title: "σ" },
+    hoverongaps: false,
+  };
+  const layout = {
+    margin: { t: 20, r: 20, b: 60, l: 180 },
+    xaxis: { side: "bottom" },
+    yaxis: { automargin: true },
+    font: { family: "Source Sans Pro, sans-serif", size: 12 },
+    height: Math.max(360, yLabels.length * 22 + 100),
+  };
+  Plotly.newPlot(chart, [trace], layout, { responsive: true, displaylogo: false });
 }
 
 async function init() {

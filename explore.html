@@ -3,7 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Explore monthly time series, seasonal cycles, interactive maps, and cross-product comparisons for every dataset in the Western US snow drought pipeline.">
 <title>Explore the Data &mdash; 2025-2026 Western US Snow Drought Explorer</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg stroke='%23162e51' stroke-width='2' stroke-linecap='round'%3E%3Cline x1='12' y1='2' x2='12' y2='22'/%3E%3Cline x1='4' y1='6' x2='20' y2='18'/%3E%3Cline x1='4' y1='18' x2='20' y2='6'/%3E%3C/g%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@400;600;700&family=Merriweather:wght@700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
@@ -13,10 +15,10 @@
 
 <header class="site-header">
   <div class="header-inner">
-    <a class="wordmark" href="index.html">Western US Winter &amp; Snow Drought Explorer <span class="beta-tag">BETA</span>
+    <h1 class="wordmark-h1"><a class="wordmark" href="index.html">Western US Winter &amp; Snow Drought Explorer <span class="beta-tag">BETA</span>
       <small>NOAA Global Monitoring Laboratory &middot; Cooperative Institute for Research in Environmental Sciences</small>
-      <small>Unofficial snow drought dashboard and data explorer</small>
-    </a>
+      <small>Unofficial snow drought dashboard and data explorer. For educational purposes only</small>
+    </a></h1>
     <nav class="site-nav">
       <a href="index.html">Home</a>
       <a href="findings.html">Key Findings</a>
@@ -25,10 +27,10 @@
       <a href="about.html">About</a>
     </nav>
   </div>
+  <div class="attribution-bar">
+    Not an official NOAA or NIDIS product. Descriptive analysis only &mdash; no forecasts, no causal claims, no year-against-year comparison.
+  </div>
 </header>
-<div class="attribution-bar">
-  Not an official NOAA or NIDIS product. Descriptive analysis only &mdash; no forecasts, no causal claims, no year-against-year comparison.
-</div>
 
 <main>
 
@@ -53,10 +55,7 @@
         <div class="selector-row">
           <select id="product-select" aria-label="Product"></select>
           <select id="response-select" aria-label="Variable"></select>
-          <div class="region-toggle" id="region-toggle">
-            <button data-region="ALL" class="active">Western US</button>
-            <button data-region="CO_UT_WY">CO-UT-WY</button>
-          </div>
+          <div class="region-toggle" id="region-toggle"></div>
         </div>
         <div class="product-meta" id="product-meta"></div>
 
@@ -67,17 +66,8 @@
         </div>
 
         <div class="view-panel active" id="panel-map">
-          <div class="map-controls">
-            <select id="map-period-select" aria-label="Month or season"></select>
-            <div class="series-toggle" id="map-year-toggle">
-              <button data-year="baseline" class="active">Climatology</button>
-              <button data-year="2025">2025 anomaly</button>
-              <button data-year="2026">2026 anomaly</button>
-            </div>
-          </div>
-          <div class="map-image-wrap" id="map-image-wrap">
-            <p class="map-empty">No map available for this selection.</p>
-          </div>
+          <p class="embedded-map-note">The same interactive map as the <a href="maps.html" id="map-panel-open-link" target="_blank">Maps</a> page, opened to this product &mdash; pan, zoom, and click to read a pixel value.</p>
+          <iframe id="map-panel-iframe" class="embedded-map-iframe" title="Interactive map" loading="lazy"></iframe>
         </div>
 
         <div class="view-panel" id="panel-timeseries">
@@ -101,43 +91,43 @@
 
   <section id="compare">
     <h2>Compare variables</h2>
-    <p>Overlay standardized anomalies (&sigma;) for up to 3 variables on one
-      chart to see how they move together over time &mdash; e.g.
-      precipitation, soil moisture, and vegetation response. All series
-      share one axis because &sigma; removes each variable's own physical
-      units, leaving only how far each one departs from its own baseline.</p>
+    <p>Overlay standardized anomalies (&sigma;) on one chart to see how
+      variables move together over time. All series share one axis because
+      &sigma; removes each variable's own physical units, leaving only how
+      far each one departs from its own baseline.</p>
     <div class="selector-row">
-      <select id="compare-region-select" aria-label="Region">
-        <option value="ALL" selected>Western US</option>
-        <option value="CO_UT_WY">CO-UT-WY</option>
-      </select>
-      <button type="button" id="compare-preset-snowdrought" class="preset-button">Snow drought ingredients (SWE, precipitation, temperature)</button>
+      <div class="series-toggle" id="compare-mode-toggle">
+        <button type="button" data-mode="category" class="active">By category (all products)</button>
+        <button type="button" data-mode="custom">Custom (pick up to 3)</button>
+      </div>
+      <select id="compare-region-select" aria-label="Region"></select>
     </div>
-    <div class="selector-row compare-pickers">
+    <div class="selector-row" id="compare-category-row">
+      <select id="compare-category-select" aria-label="Category"></select>
+    </div>
+    <p id="compare-category-note" class="value-glossary"></p>
+    <div class="selector-row compare-pickers" id="compare-custom-row" style="display:none;">
       <select id="compare-select-0" aria-label="Variable 1"></select>
       <select id="compare-select-1" aria-label="Variable 2"></select>
       <select id="compare-select-2" aria-label="Variable 3"></select>
+      <button type="button" id="compare-preset-snowdrought" class="preset-button">Snow drought ingredients (SWE, precipitation, temperature)</button>
     </div>
     <div id="compare-chart" style="height:480px;"></div>
   </section>
 
   <section id="heatmaps">
     <h2>Heatmaps</h2>
+    <p>Standardized anomaly (&sigma;) by product and month, computed the same
+      way as every other chart on this page -- not a static image.</p>
     <div class="explorer-layout">
       <nav class="category-tabs" id="heatmap-category-tabs" aria-label="Category"></nav>
 
       <div>
         <div class="selector-row">
           <select id="heatmap-family-select" aria-label="Heatmap family"></select>
-          <div class="series-toggle" id="heatmap-threshold-toggle">
-            <button data-threshold="all" class="active">All values</button>
-            <button data-threshold="1sigma">|&sigma;| &ge; 1</button>
-            <button data-threshold="2sigma">|&sigma;| &ge; 2</button>
-          </div>
+          <select id="heatmap-region-select" aria-label="Region"></select>
         </div>
-        <div class="map-image-wrap" id="heatmap-image-wrap">
-          <p class="map-empty">Loading&hellip;</p>
-        </div>
+        <div id="heatmap-chart"></div>
       </div>
     </div>
   </section>

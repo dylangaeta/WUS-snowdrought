@@ -3,7 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Interactive dashboard tracking the 2025-2026 Western US snow drought across snow, water, carbon, and vegetation observations. Unofficial, descriptive-only -- not a NOAA or NIDIS product.">
 <title>2025-2026 Western US Snow Drought Explorer</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg stroke='%23162e51' stroke-width='2' stroke-linecap='round'%3E%3Cline x1='12' y1='2' x2='12' y2='22'/%3E%3Cline x1='4' y1='6' x2='20' y2='18'/%3E%3Cline x1='4' y1='18' x2='20' y2='6'/%3E%3C/g%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@400;600;700&family=Merriweather:wght@700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
@@ -12,10 +14,10 @@
 
 <header class="site-header">
   <div class="header-inner">
-    <a class="wordmark" href="index.html">Western US Winter &amp; Snow Drought Explorer <span class="beta-tag">BETA</span>
+    <h1 class="wordmark-h1"><a class="wordmark" href="index.html">Western US Winter &amp; Snow Drought Explorer <span class="beta-tag">BETA</span>
       <small>NOAA Global Monitoring Laboratory &middot; Cooperative Institute for Research in Environmental Sciences</small>
-      <small>Unofficial snow drought dashboard and data explorer</small>
-    </a>
+      <small>Unofficial snow drought dashboard and data explorer. For educational purposes only</small>
+    </a></h1>
     <nav class="site-nav">
       <a href="index.html" class="active">Home</a>
       <a href="findings.html">Key Findings</a>
@@ -24,10 +26,10 @@
       <a href="about.html">About</a>
     </nav>
   </div>
+  <div class="attribution-bar">
+    Not an official NOAA or NIDIS product. Descriptive analysis only &mdash; no forecasts, no causal claims, no year-against-year comparison.
+  </div>
 </header>
-<div class="attribution-bar">
-  Not an official NOAA or NIDIS product. Descriptive analysis only &mdash; no forecasts, no causal claims, no year-against-year comparison.
-</div>
 
 <a id="top"></a>
 <main>
@@ -54,7 +56,7 @@
     </p>
     <div class="selector-row">
       <select id="summary-region-group-select" aria-label="Regions">
-        <option value="summary" selected>Summary (Western US &amp; CO-UT-WY)</option>
+        <option value="summary" selected>Regions</option>
         <option value="states">States</option>
         <option value="huc2">HUC2 regions</option>
       </select>

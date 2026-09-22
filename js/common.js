@@ -18,6 +18,193 @@ const SEASON_MONTHS = {
   DJF: [12, 1, 2], NDJF: [11, 12, 1, 2], DJFM: [12, 1, 2, 3], AMJJ: [4, 5, 6, 7],
 };
 
+// Mirrors config.py's PRODUCT_OBSERVATION_KIND exactly -- do not diverge.
+// Drives solid (observation) vs dashed (model) line styling in the
+// category-grouped overlay view, same convention as
+// 11_combined_GroupOverlays_analyze.py's line_style().
+const PRODUCT_OBSERVATION_KIND = {
+  "ERA5-Land": "model", "GFED5": "observation", "GPCP": "observation",
+  "GRACE-JPL-L3": "observation", "NLDAS-Mosaic": "model", "NLDAS-Noah": "model",
+  "NLDAS-VIC": "model", "PRISM": "observation", "SiB4": "model",
+  "UA-SWE-Monthly": "observation", "IMS-Snow": "observation", "SMAP": "observation",
+  "SNODAS": "model", "GlobSnow": "observation", "Rutgers-Snow": "observation",
+  "gridMET-Fire": "model", "MODIS-TerraAqua": "observation", "OCO-2": "observation",
+  "PhenoCam": "observation", "SMOS": "observation", "CAMS": "model",
+  "CarbonTracker": "model", "FluxSat": "model", "GOSIF": "model",
+  "GOSIF-GPP": "model", "MiCASA": "model", "MODIS-Terra": "observation",
+  "MODIS-Aqua": "observation", "TROPOSIF": "observation", "SPI": "observation",
+  "SPEI": "observation", "EDDI": "model", "PDSI": "model", "ForDRI": "model",
+  "ESI": "observation", "VHP": "observation", "VegDRI": "observation",
+  "USDM": "observation", "VIIRS": "observation", "GRACE-L4": "model",
+  "NEON": "observation",
+};
+
+// Mirrors config.py's COMBINED_INVERTED_VALENCE_RESPONSES exactly -- do not
+// diverge. These responses' natural sign is opposite their overlay group's
+// stress convention (e.g. dead fuel moisture rises when SAFER, opposite
+// fire-danger indices) and are negated before standardizing so a group
+// overlay reads sign-coherently.
+const COMBINED_INVERTED_VALENCE_RESPONSES = new Set(["FM100", "FM1000", "TD2m", "NEE", "LAND_CARBON_EXCHANGE"]);
+
+// Mirrors config.py's COMBINED_GROWING_SEASON_MIN_AMPLITUDE_FRACTION exactly.
+// A calendar month is kept in the vegetation group overlay only where its
+// baseline mean clears this fraction of the seasonal amplitude above the
+// dormant trough -- otherwise a tiny winter absolute anomaly divided by a
+// near-zero dormant-season spread explodes the standardized value.
+const COMBINED_GROWING_SEASON_MIN_AMPLITUDE_FRACTION = 0.15;
+
+// ---------------------------------------------------------- Window statistics
+//
+// Shared season-window aggregation + non-parametric standardization, used by
+// both the homepage summary table (js/summary.js) and the dynamic heatmaps
+// (js/explore.js) -- one implementation so the two views can never drift
+// against each other.
+
+function daysInMonth(year, month) {
+  return new Date(year, month, 0).getDate();
+}
+
+// Inverse standard normal CDF (probit) via Peter Acklam's rational
+// approximation (accurate to ~1.15e-9) -- mirrors scipy.stats.norm.ppf, used
+// so the season-window statistic below matches code/common/detrend.py's
+// normal_score_transform (the pipeline's canonical, non-parametric
+// standardization) instead of a from-scratch parametric z-score.
+function normInv(p) {
+  if (p <= 0) return -Infinity;
+  if (p >= 1) return Infinity;
+  const a = [-3.969683028665376e+01, 2.209460984245205e+02, -2.759285104469687e+02, 1.383577518672690e+02, -3.066479806614716e+01, 2.506628277459239e+00];
+  const b = [-5.447609879822406e+01, 1.615858368580409e+02, -1.556989798598866e+02, 6.680131188771972e+01, -1.328068155288572e+01];
+  const c = [-7.784894002430293e-03, -3.223964580411365e-01, -2.400758277161838e+00, -2.549732539343734e+00, 4.374664141464968e+00, 2.938163982698783e+00];
+  const d = [7.784695709041462e-03, 3.224671290700398e-01, 2.445134137142996e+00, 3.754408661907416e+00];
+  const pLow = 0.02425;
+  const pHigh = 1 - pLow;
+  if (p < pLow) {
+    const q = Math.sqrt(-2 * Math.log(p));
+    return (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1);
+  }
+  if (p <= pHigh) {
+    const q = p - 0.5;
+    const r = q * q;
+    return (((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5]) * q / (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1);
+  }
+  const q = Math.sqrt(-2 * Math.log(1 - p));
+  return -(((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1);
+}
+
+function sigmaToPercentileLabel(percentile) {
+  if (percentile >= 99.95) return ">99.9%";
+  if (percentile <= 0.05) return "<0.1%";
+  return `${Math.round(percentile)}%`;
+}
+
+// Standard normal CDF via the Abramowitz & Stegun 7.1.26 erf approximation
+// (max error ~1.5e-7) -- only used for native standardized indices
+// (SPI/SPEI/EDDI/...), whose own value is already an approximately
+// standard-normal quantity by construction, so a forward CDF is the correct
+// (not the rank-based) way to read its percentile.
+function erf(x) {
+  const sign = x < 0 ? -1 : 1;
+  x = Math.abs(x);
+  const a1 = 0.254829592, a2 = -0.284496736, a3 = 1.421413741, a4 = -1.453152027, a5 = 1.061405429, p = 0.3275911;
+  const t = 1 / (1 + p * x);
+  const y = 1 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-x * x);
+  return sign * y;
+}
+
+function nativeIndexPercentile(sigma) {
+  return 50 * (1 + erf(sigma / Math.SQRT2));
+}
+
+// Mirrors common/detrend.py's MIN_BASELINE_YEARS -- must stay in sync.
+const MIN_BASELINE_YEARS = 3;
+
+function windowMonthYearPairs(windowKey, targetYear) {
+  const months = SEASON_MONTHS[windowKey] || [parseInt(windowKey, 10)];
+  const crossesNewYear = months.includes(1) && months.some((m) => m >= 10);
+  return months.map((month) => ({
+    month,
+    year: crossesNewYear && month >= 10 ? targetYear - 1 : targetYear,
+  }));
+}
+
+function aggregateWindow(region, windowKey, targetYear, rule, field) {
+  const pairs = windowMonthYearPairs(windowKey, targetYear);
+  const values = [];
+  const weights = [];
+  for (const { month, year } of pairs) {
+    const dateStr = `${year}-${String(month).padStart(2, "0")}-01`;
+    const idx = region.dates.indexOf(dateStr);
+    if (idx === -1 || region[field][idx] === null) return null;
+    values.push(region[field][idx]);
+    weights.push(rule === "day_weighted_mean" ? daysInMonth(year, month) : 1);
+  }
+  if (rule === "sum") return values.reduce((a, b) => a + b, 0);
+  const totalWeight = weights.reduce((a, b) => a + b, 0);
+  return values.reduce((sum, v, i) => sum + v * weights[i], 0) / totalWeight;
+}
+
+function meanStd(values) {
+  const mean = values.reduce((a, b) => a + b, 0) / values.length;
+  const variance = values.reduce((a, b) => a + (b - mean) ** 2, 0) / (values.length - 1);
+  return { mean, std: Math.sqrt(variance) };
+}
+
+// Returns { sigma, percentile, rawValue, percentOfNormal, isNativeIndex }
+// for one product/response/region/window/year. sigma/percentile standardize
+// the window-aggregated anomaly the same way common/detrend.py's
+// normal_score_transform standardizes a single month: rank the target
+// against the baseline years' own aggregated-anomaly distribution (Weibull
+// plotting position), then map that percentile through the inverse normal
+// CDF -- non-parametric, so it stays meaningful for skewed/bounded fields
+// instead of assuming the baseline years are normally distributed.
+// percentOfNormal is null wherever the baseline mean is too close to zero to
+// divide by meaningfully (e.g. some temperature/VPD anomaly-prone fields),
+// or for native standardized indices (already a departure statistic, not a
+// physical quantity with a "normal").
+function computeWindowValue(data, region, windowKey, targetYear) {
+  if (data.aggregation === "native_index") {
+    // A native index (e.g. SPI-03) is already its own trailing N-month
+    // statistic, so it can't be re-aggregated across a season window -- but
+    // it's still meaningful for one: show its reading as of the window's
+    // own last month (e.g. DJFM -> its March value, which for a 3-month
+    // index already reflects Jan-Mar).
+    const pairs = windowMonthYearPairs(windowKey, targetYear);
+    const { month, year } = pairs[pairs.length - 1];
+    const dateStr = `${year}-${String(month).padStart(2, "0")}-01`;
+    const idx = region.dates.indexOf(dateStr);
+    if (idx === -1) return null;
+    const v = region.value[idx];
+    return { sigma: v, percentile: null, rawValue: v, percentOfNormal: null, isNativeIndex: true };
+  }
+  const targetAnomaly = aggregateWindow(region, windowKey, targetYear, data.aggregation, "anomaly");
+  const targetRaw = aggregateWindow(region, windowKey, targetYear, data.aggregation, "value");
+  if (targetAnomaly === null || targetRaw === null) return null;
+
+  const baselineAnomalies = [];
+  const baselineRaws = [];
+  for (let y = region.baseline_start_year; y <= region.baseline_end_year; y++) {
+    const a = aggregateWindow(region, windowKey, y, data.aggregation, "anomaly");
+    const r = aggregateWindow(region, windowKey, y, data.aggregation, "value");
+    if (a !== null) baselineAnomalies.push(a);
+    if (r !== null) baselineRaws.push(r);
+  }
+  if (baselineAnomalies.length < MIN_BASELINE_YEARS) return null;
+  baselineAnomalies.sort((a, b) => a - b);
+  const n = baselineAnomalies.length;
+  const rank = baselineAnomalies.filter((a) => a <= targetAnomaly).length; // matches np.searchsorted(..., side="right")
+  const percentile = ((rank + 0.5) / (n + 1)) * 100;
+  const sigma = normInv(percentile / 100);
+
+  let percentOfNormal = null;
+  if (baselineRaws.length >= 2) {
+    const { mean: meanRaw, std: stdRaw } = meanStd(baselineRaws);
+    // Guard: a baseline mean within one baseline std of zero makes "percent
+    // of normal" numerically unstable (small denominator), not meaningful.
+    if (Math.abs(meanRaw) > stdRaw) percentOfNormal = ((targetRaw - meanRaw) / meanRaw) * 100;
+  }
+  return { sigma, percentile, rawValue: targetRaw, percentOfNormal, isNativeIndex: false };
+}
+
 let manifest = null;
 
 async function loadManifest() {
@@ -26,14 +213,44 @@ async function loadManifest() {
   return manifest;
 }
 
-// Large binary assets (COGs under cogs/, static map PNGs under figures/maps/)
-// are served from external object storage (a Cloudflare R2 bucket,
-// wus-snowdrought), not committed to this repo -- both directories are
-// synced to the same bucket under their existing relative-path prefixes, so
-// one base URL covers both. Empty string falls back to the local relative
-// path, which is what a local checkout with cogs/ and figures/ still on disk
-// uses.
-const R2_BASE_URL = "https://pub-0bea8387645a493dbf0dddd3045e4ae4.r2.dev";
+// Every top-level region (Western US, CO-UT-WY, and whatever else the
+// pipeline adds -- e.g. NOAA climate regions) comes from manifest.region_labels,
+// never hardcoded here, so a new region shows up everywhere the moment the
+// pipeline export includes it -- no dashboard code change needed.
+function regionEntries() {
+  return Object.entries(manifest.region_labels).map(([code, label]) => ({ code, label }));
+}
+
+function populateRegionSelect(select, defaultCode = "ALL") {
+  select.innerHTML = "";
+  regionEntries().forEach(({ code, label }) => {
+    const option = document.createElement("option");
+    option.value = code;
+    option.textContent = label;
+    if (code === defaultCode) option.selected = true;
+    select.appendChild(option);
+  });
+}
+
+function populateRegionToggle(container, defaultCode = "ALL") {
+  container.innerHTML = "";
+  regionEntries().forEach(({ code, label }) => {
+    const button = document.createElement("button");
+    button.dataset.region = code;
+    button.textContent = label;
+    if (code === defaultCode) button.classList.add("active");
+    container.appendChild(button);
+  });
+}
+
+// COGs (cogs/) are large binary assets served from external object storage
+// (a Cloudflare R2 bucket, wus-snowdrought), not committed to this repo. On
+// localhost, always fall back to the local relative cogs/ path instead --
+// local dev/testing shouldn't depend on the R2 bucket being populated (and
+// this account's DNS resolver blackholes *.r2.dev to 127.0.0.1, so pointing
+// local testing at R2 doesn't even fail gracefully, it just hangs/refuses).
+const IS_LOCALHOST = ["localhost", "127.0.0.1"].includes(window.location.hostname);
+const R2_BASE_URL = IS_LOCALHOST ? "" : "https://pub-0bea8387645a493dbf0dddd3045e4ae4.r2.dev";
 
 function assetUrl(relativePath) {
   return R2_BASE_URL ? `${R2_BASE_URL.replace(/\/$/, "")}/${relativePath}` : relativePath;
