@@ -126,14 +126,6 @@ a:hover { color: var(--navy); }
   border-bottom-color: var(--gold);
 }
 
-.attribution-bar {
-  background: #0b1c33;
-  color: #9fb0c9;
-  font-size: 0.78rem;
-  padding: 0.35rem 1.5rem;
-  text-align: center;
-}
-
 main { max-width: 1200px; margin: 0 auto; padding: 0 1.5rem 3rem; }
 main section[id] { scroll-margin-top: 5rem; }
 
@@ -369,11 +361,25 @@ table.headline-table td.window-growing { background: #fbe2ec; color: #7a1240; fo
 }
 .map-image-wrap img { max-width: 100%; height: auto; border-radius: var(--radius-sm); }
 .embedded-map-note { font-size: 0.9rem; color: var(--text-muted); margin-bottom: 0.5rem; }
-body.embedded .site-header, body.embedded .attribution-bar { display: none; }
-body.embedded main { padding-top: 1rem; }
+body.embedded .site-header { display: none; }
+body.embedded main { padding: 0.5rem; }
+/* maps.html's own heading/intro/search/category-tabs/product picker are all
+   redundant with the page already embedding it (Explore already has its own
+   picker and passes the selection via URL hash) -- shown, they doubled the
+   page inside the iframe and forced an internal scrollbar ("buried in a
+   scrollable box"). Only the map itself + its own per-view controls stay. */
+body.embedded #interactive-maps > h2,
+body.embedded #interactive-maps > p,
+body.embedded .product-search-wrap,
+body.embedded .category-tabs,
+body.embedded .selector-row,
+body.embedded .product-meta {
+  display: none;
+}
+body.embedded .explorer-layout { grid-template-columns: 1fr; gap: 0; }
 .embedded-map-iframe {
   width: 100%;
-  height: 600px;
+  min-height: 300px;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-sm);

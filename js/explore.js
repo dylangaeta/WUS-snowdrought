@@ -195,12 +195,27 @@ function renderActiveView() {
 // already-verified interactive COG map (maps.html) via the same URL-hash
 // view-sharing format js/map-viewer.js's copyViewLink() writes, rather than
 // duplicating its ~500 lines of OpenLayers setup for a second instance.
+let mapIframeResizeObserver = null;
+
 function renderMap() {
   const params = new URLSearchParams({
     category: explorerState.category, product: explorerState.product, response: explorerState.response,
   });
-  document.getElementById("map-panel-iframe").src = `maps.html?embed=1#${params.toString()}`;
+  const iframe = document.getElementById("map-panel-iframe");
+  iframe.src = `maps.html?embed=1#${params.toString()}`;
   document.getElementById("map-panel-open-link").href = `maps.html#${params.toString()}`;
+  // Same-origin iframe: size it to its own content's real height instead of
+  // a fixed pixel guess, so it never grows its own internal scrollbar (the
+  // content height varies with period -- DJFM's slider vs. the 3-button
+  // toggle -- and with product-meta text length).
+  iframe.onload = () => {
+    if (mapIframeResizeObserver) mapIframeResizeObserver.disconnect();
+    const body = iframe.contentDocument.body;
+    const resize = () => { iframe.style.height = `${body.scrollHeight}px`; };
+    resize();
+    mapIframeResizeObserver = new ResizeObserver(resize);
+    mapIframeResizeObserver.observe(body);
+  };
 }
 
 async function fetchSeries(kind) {
