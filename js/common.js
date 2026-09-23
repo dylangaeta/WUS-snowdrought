@@ -2,6 +2,12 @@
 // about.html): the manifest fetch and the small set of constants/helpers
 // every page needs. No page-specific state lives here.
 
+// Hard floor across every page (Dylan, 2026-09): a handful of products
+// (SPI/SPEI/PRISM-based) have a real record back to 1895, which compresses
+// this whole dashboard's actual 1990-2026 baseline era into a sliver
+// whenever a chart shares one axis/dropdown across many products.
+const DASHBOARD_MIN_YEAR = 1990;
+
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",

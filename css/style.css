@@ -369,6 +369,28 @@ table.headline-table td.window-growing { background: #fbe2ec; color: #7a1240; fo
 .value-glossary { font-size: 0.85rem; color: var(--text-muted); margin: -0.4rem 0 1rem; font-style: italic; }
 .compare-pickers select { min-width: 220px; }
 
+/* "By category" Compare mode: real checkboxes next to each variable instead
+   of Plotly's own built-in legend -- with ~15-20 products in some
+   categories, showing them all at once on load was unreadable, so only the
+   first 1-2 start checked and the rest are opt-in. */
+.compare-chart-layout { display: flex; gap: 1rem; align-items: flex-start; }
+.compare-chart-layout #compare-chart { flex: 1; min-width: 0; }
+.compare-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  max-height: 480px;
+  overflow-y: auto;
+  min-width: 220px;
+  font-size: 0.85rem;
+}
+.compare-legend-item { display: flex; align-items: center; gap: 0.45rem; cursor: pointer; }
+.compare-legend-swatch { display: inline-block; width: 1.1em; height: 0.3em; border-radius: 2px; flex-shrink: 0; }
+@media (max-width: 820px) {
+  .compare-chart-layout { flex-direction: column; }
+  .compare-legend { max-height: 240px; min-width: 0; }
+}
+
 .region-toggle, .view-tabs {
   display: inline-flex;
   border: 1px solid var(--border);

@@ -25,6 +25,14 @@ const explorerState = {
 // never blend into either.
 const EXTRA_YEAR_COLORS = ["#3182bd", "#756bb1", "#31a354", "#e7298a", "#636363", "#1b9e77"];
 
+// DASHBOARD_MIN_YEAR is defined once in js/common.js (shared by every page).
+function filterFrom1990(dates, values) {
+  return {
+    dates: dates.filter((d) => parseInt(d.slice(0, 4), 10) >= DASHBOARD_MIN_YEAR),
+    values: values.filter((_, i) => parseInt(dates[i].slice(0, 4), 10) >= DASHBOARD_MIN_YEAR),
+  };
+}
+
 function currentResponseEntry() {
   return manifest.categories[explorerState.category][explorerState.product][explorerState.response];
 }
@@ -162,14 +170,16 @@ function onSelectionChanged() {
 // record_start/record_end) -- no data fetch needed, those are already in
 // the manifest entry every page already has in hand.
 function populateYearControls(entry) {
-  const startYear = entry.record_start ? parseInt(entry.record_start.slice(0, 4), 10) : null;
+  const startYear = entry.record_start
+    ? Math.max(DASHBOARD_MIN_YEAR, parseInt(entry.record_start.slice(0, 4), 10))
+    : null;
   const endYear = entry.record_end ? parseInt(entry.record_end.slice(0, 4), 10) : null;
 
   const tsSelect = document.getElementById("timeseries-start-year-select");
   tsSelect.innerHTML = "";
   const allOption = document.createElement("option");
   allOption.value = "";
-  allOption.textContent = "All years";
+  allOption.textContent = `All years (from ${DASHBOARD_MIN_YEAR})`;
   tsSelect.appendChild(allOption);
   if (startYear !== null && endYear !== null) {
     for (let y = startYear; y <= endYear; y++) {
@@ -344,11 +354,9 @@ async function renderTimeseries() {
   const sigmaLabel = data.native_standardized
     ? `${data.response} (native standardized index)`
     : "Standardized anomaly (σ)";
-  const startYear = explorerState.timeseriesStartYear;
-  const dates = startYear ? region.dates.filter((d) => parseInt(d.slice(0, 4), 10) >= startYear) : region.dates;
-  const y = startYear
-    ? fullY.filter((_, i) => parseInt(region.dates[i].slice(0, 4), 10) >= startYear)
-    : fullY;
+  const startYear = Math.max(DASHBOARD_MIN_YEAR, explorerState.timeseriesStartYear || DASHBOARD_MIN_YEAR);
+  const dates = region.dates.filter((d) => parseInt(d.slice(0, 4), 10) >= startYear);
+  const y = fullY.filter((_, i) => parseInt(region.dates[i].slice(0, 4), 10) >= startYear);
   const traces = [{
     x: dates, y, type: "scatter", mode: "lines",
     line: { color: "#1b1b1b", width: 1.4 },
@@ -485,6 +493,10 @@ function setCompareMode(mode) {
   document.getElementById("compare-custom-row").style.display = mode === "custom" ? "" : "none";
   document.getElementById("compare-category-row").style.display = mode === "category" ? "" : "none";
   document.getElementById("compare-category-note").style.display = mode === "category" ? "" : "none";
+  // Custom mode already limits to 3 picks via its own dropdowns -- the
+  // checkbox legend is category-mode-only, so clear any leftover from a
+  // previous category-mode render.
+  if (mode === "custom") document.getElementById("compare-category-legend").innerHTML = "";
 }
 
 function initCompareView() {
@@ -607,14 +619,19 @@ async function renderCustomOverlay() {
     const region = data.regions[compareState.region];
     if (!region) continue;
     const detrendMethod = findResponseEntry(product, response)?.detrend_method;
+    const { dates, values } = filterFrom1990(region.dates, region.sigma);
     traces.push({
-      x: region.dates, y: region.sigma, type: "scatter", mode: "lines",
+      x: dates, y: values, type: "scatter", mode: "lines",
       line: { color: COMPARE_COLORS[i], width: 1.8 },
       name: `${product} ${response}${detrendShortSuffix(detrendMethod)}`,
     });
   }
   Plotly.newPlot(chart, traces, plotlyLayout(), { responsive: true, displaylogo: false });
 }
+
+// How many series start checked/visible when a category first loads -- the
+// rest are opt-in via the checkbox legend (renderCategoryLegend below).
+const CATEGORY_OVERLAY_DEFAULT_VISIBLE = 2;
 
 async function renderCategoryOverlay() {
   const chart = document.getElementById("compare-chart");
@@ -627,11 +644,13 @@ async function renderCategoryOverlay() {
   }
   if (pairs.length === 0) {
     chart.innerHTML = '<p class="chart-empty">No products in this category.</p>';
+    document.getElementById("compare-category-legend").innerHTML = "";
     return;
   }
-  note.textContent = "Solid = observation, dashed = model -- the same grouping and styling as the pipeline's own combined-overlay figures.";
+  note.textContent = "Solid = observation, dashed = model -- the same grouping and styling as the pipeline's own combined-overlay figures. Check a variable to add it to the chart.";
 
   const traces = [];
+  const legendItems = [];
   let colorIndex = 0;
   for (const { product, response } of pairs) {
     const key = `${product}_${response}`;
@@ -660,17 +679,42 @@ async function renderCategoryOverlay() {
 
     const isObservation = PRODUCT_OBSERVATION_KIND[product] === "observation";
     const detrendMethod = products[product][response].detrend_method;
+    const color = CATEGORY_OVERLAY_COLORS[colorIndex % CATEGORY_OVERLAY_COLORS.length];
+    const name = `${product} ${response}${detrendShortSuffix(detrendMethod)}`;
+    const visible = colorIndex < CATEGORY_OVERLAY_DEFAULT_VISIBLE;
+    const { dates, values } = filterFrom1990(region.dates, sigma);
     traces.push({
-      x: region.dates, y: sigma, type: "scatter", mode: "lines", connectgaps: false,
-      line: {
-        color: CATEGORY_OVERLAY_COLORS[colorIndex % CATEGORY_OVERLAY_COLORS.length],
-        width: 1.6, dash: isObservation ? "solid" : "dash",
-      },
-      name: `${product} ${response}${detrendShortSuffix(detrendMethod)}`,
+      x: dates, y: values, type: "scatter", mode: "lines", connectgaps: false,
+      line: { color, width: 1.6, dash: isObservation ? "solid" : "dash" },
+      name, visible,
     });
+    legendItems.push({ name, color, visible });
     colorIndex++;
   }
-  Plotly.newPlot(chart, traces, plotlyLayout(), { responsive: true, displaylogo: false });
+  Plotly.newPlot(chart, traces, { ...plotlyLayout(), showlegend: false }, { responsive: true, displaylogo: false });
+  renderCategoryLegend(legendItems);
+}
+
+function renderCategoryLegend(items) {
+  const container = document.getElementById("compare-category-legend");
+  container.innerHTML = "";
+  items.forEach((item, i) => {
+    const label = document.createElement("label");
+    label.className = "compare-legend-item";
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.checked = item.visible;
+    checkbox.addEventListener("change", (event) => {
+      Plotly.restyle(document.getElementById("compare-chart"), { visible: event.target.checked }, [i]);
+    });
+    const swatch = document.createElement("span");
+    swatch.className = "compare-legend-swatch";
+    swatch.style.background = item.color;
+    label.appendChild(checkbox);
+    label.appendChild(swatch);
+    label.appendChild(document.createTextNode(item.name));
+    container.appendChild(label);
+  });
 }
 
 // ---------------------------------------------------------------- Heatmaps
@@ -823,13 +867,7 @@ async function renderHeatmap() {
     };
   } else {
     const windowKey = HEATMAP_FAMILIES[heatmapState.family].window;
-    // fullRecordYearRange() spans every product's true record_start (1895
-    // for SPI/SPEI/PRISM-based products), which would compress this whole
-    // dashboard's real 1990-2026 baseline era into a sliver -- floor at
-    // 1990 to match the About page's own coverage-chart floor.
-    const fullRange = fullRecordYearRange();
-    const minYear = Math.max(1990, fullRange.minYear);
-    const maxYear = fullRange.maxYear;
+    const { minYear, maxYear } = fullRecordYearRange(); // already floored at DASHBOARD_MIN_YEAR
     const years = [];
     for (let y = minYear; y <= maxYear; y++) years.push(y);
     xLabels = years.map(String);

@@ -38,10 +38,12 @@ function rebuildRegionColumns() {
 }
 
 // The year select's range comes from the actual record_start/record_end
-// spread across every product in the manifest, not a fixed cutoff -- a
-// product with a longer record (e.g. PRISM back to 1895) simply produces
-// "--" rows for years outside its own coverage, same as already happens
-// for 2025 vs. 2026 today.
+// spread across every product in the manifest, floored at DASHBOARD_MIN_YEAR
+// (js/common.js) -- a handful of products (e.g. PRISM back to 1895) would
+// otherwise push the range's start back nearly a century for a dropdown
+// that's really about this dashboard's 1990-2026 baseline era. A product
+// with a shorter record than that still just produces "--" rows for years
+// outside its own coverage, same as already happens for 2025 vs. 2026 today.
 function fullRecordYearRange() {
   let minYear = Infinity;
   let maxYear = -Infinity;
@@ -53,7 +55,7 @@ function fullRecordYearRange() {
       }
     }
   }
-  return { minYear, maxYear };
+  return { minYear: Math.max(DASHBOARD_MIN_YEAR, minYear), maxYear };
 }
 
 function initSummaryTable() {
