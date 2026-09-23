@@ -370,26 +370,28 @@ table.headline-table td.window-growing { background: #fbe2ec; color: #7a1240; fo
 .compare-pickers select { min-width: 220px; }
 
 /* "By category" Compare mode: real checkboxes next to each variable instead
-   of Plotly's own built-in legend -- with ~15-20 products in some
+   of Plotly's own built-in legend -- with ~15-27 products in some
    categories, showing them all at once on load was unreadable, so only the
-   first 1-2 start checked and the rest are opt-in. */
-.compare-chart-layout { display: flex; gap: 1rem; align-items: flex-start; }
-.compare-chart-layout #compare-chart { flex: 1; min-width: 0; }
+   first 1-2 start checked and the rest are opt-in. Legend sits BELOW the
+   chart (not beside it) as a wrapping grid, not a fixed-width sidebar --
+   a side-by-side layout meant computing a width split between a
+   Plotly-rendered chart and a fixed-width column that doesn't reliably hold
+   at every real browser window size, cutting the legend off-screen. Below
+   the chart, full page width, wrapping freely, has no such failure mode. */
+.compare-chart-layout { display: flex; flex-direction: column; gap: 0.75rem; }
 .compare-legend {
   display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-  max-height: 480px;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.25rem;
+  max-height: 220px;
   overflow-y: auto;
-  min-width: 220px;
   font-size: 0.85rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
 }
-.compare-legend-item { display: flex; align-items: center; gap: 0.45rem; cursor: pointer; }
+.compare-legend-item { display: flex; align-items: center; gap: 0.4rem; cursor: pointer; white-space: nowrap; }
 .compare-legend-swatch { display: inline-block; width: 1.1em; height: 0.3em; border-radius: 2px; flex-shrink: 0; }
-@media (max-width: 820px) {
-  .compare-chart-layout { flex-direction: column; }
-  .compare-legend { max-height: 240px; min-width: 0; }
-}
 
 .region-toggle, .view-tabs {
   display: inline-flex;
