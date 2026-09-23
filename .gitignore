@@ -1,7 +1,11 @@
-# Large binary assets served from Cloudflare R2 (see js/common.js's
-# assetUrl() and scripts/sync_cogs_to_r2.sh) -- too large to commit to git /
-# serve from GitHub Pages, kept locally only as a dev fallback.
+# Served from Cloudflare R2 instead of git/GitHub Pages (see js/common.js's
+# assetUrl() and scripts/sync_cogs_to_r2.sh), kept locally only as a dev
+# fallback. cogs/ is large binary data; data/ is small individually but
+# gets fully rewritten on every pipeline export, so committing it grows
+# git history forever with no way to reclaim the space. figures/maps/ is
+# dead output from a superseded architecture, not served anywhere.
 /cogs/
+/data/
 /figures/maps/
 
 .DS_Store

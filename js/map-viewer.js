@@ -208,7 +208,7 @@ function initInteractiveMap() {
 
   olMapState.boundaryLayer = new ol.layer.Vector({
     source: new ol.source.Vector({
-      url: "data/western_states.geojson",
+      url: assetUrl("data/western_states.geojson"),
       format: new ol.format.GeoJSON(),
     }),
     style: new ol.style.Style({
@@ -335,7 +335,7 @@ function initInteractiveMap() {
 async function fetchMapStyle(product, response) {
   const key = `${product}_${response}`;
   if (!olMapState.styleCache[key]) {
-    const res = await fetch(`data/map_styles/${key}.json`);
+    const res = await fetch(assetUrl(`data/map_styles/${key}.json`));
     if (!res.ok) {
       olMapState.styleCache[key] = null;
       return null;

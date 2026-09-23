@@ -31,7 +31,7 @@ const quadrantState = { region: "ALL", x: "t_anom", y: "ppt_anom", rows: [] };
 async function initQuadrantView() {
   const xSelect = document.getElementById("quadrant-x-select");
   if (!xSelect) return;
-  const res = await fetch("data/snow_drought_classification.json");
+  const res = await fetch(assetUrl("data/snow_drought_classification.json"));
   if (!res.ok) {
     document.getElementById("snow-drought-classification").style.display = "none";
     return;

@@ -14,7 +14,7 @@ let summaryRegionColumns = []; // [{code, label}], rebuilt whenever regionGroup 
 async function fetchSummaryData(product, response) {
   const key = `${product}_${response}`;
   if (!summaryState.cache[key]) {
-    const res = await fetch(`data/timeseries/${key}.json`);
+    const res = await fetch(assetUrl(`data/timeseries/${key}.json`));
     summaryState.cache[key] = await res.json();
   }
   return summaryState.cache[key];

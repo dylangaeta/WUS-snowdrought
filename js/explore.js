@@ -236,7 +236,7 @@ function renderMap() {
 async function fetchSeries(kind) {
   const key = `${kind}:${explorerState.product}_${explorerState.response}`;
   if (!explorerState.seriesCache[key]) {
-    const response = await fetch(`data/${kind}/${explorerState.product}_${explorerState.response}.json`);
+    const response = await fetch(assetUrl(`data/${kind}/${explorerState.product}_${explorerState.response}.json`));
     explorerState.seriesCache[key] = await response.json();
   }
   return explorerState.seriesCache[key];
@@ -434,7 +434,7 @@ function initCompareView() {
 
 async function fetchCompareSeries(key) {
   if (!compareState.cache[key]) {
-    const res = await fetch(`data/timeseries/${key}.json`);
+    const res = await fetch(assetUrl(`data/timeseries/${key}.json`));
     compareState.cache[key] = await res.json();
   }
   return compareState.cache[key];
@@ -442,7 +442,7 @@ async function fetchCompareSeries(key) {
 
 async function fetchCompareSeasonal(key) {
   if (!(key in compareState.seasonalCache)) {
-    const res = await fetch(`data/seasonal/${key}.json`);
+    const res = await fetch(assetUrl(`data/seasonal/${key}.json`));
     compareState.seasonalCache[key] = res.ok ? await res.json() : null;
   }
   return compareState.seasonalCache[key];
@@ -620,7 +620,7 @@ function selectHeatmapCategory(category) {
 
 async function fetchHeatmapSeries(key) {
   if (!heatmapState.cache[key]) {
-    const res = await fetch(`data/timeseries/${key}.json`);
+    const res = await fetch(assetUrl(`data/timeseries/${key}.json`));
     heatmapState.cache[key] = await res.json();
   }
   return heatmapState.cache[key];

@@ -208,7 +208,7 @@ function computeWindowValue(data, region, windowKey, targetYear) {
 let manifest = null;
 
 async function loadManifest() {
-  const response = await fetch("data/manifest.json");
+  const response = await fetch(assetUrl("data/manifest.json"));
   manifest = await response.json();
   return manifest;
 }
