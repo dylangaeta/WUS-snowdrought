@@ -121,7 +121,15 @@ async function renderHeatmap() {
   }
   chart.innerHTML = '<p class="chart-empty">Computing…</p>';
 
-  let xLabels, z, dataForRow;
+  // Fetch every product's JSON concurrently instead of one at a time --
+  // "All products" is ~100 items, and awaiting each fetch in turn meant a
+  // full re-render waited on ~100 sequential network round-trips
+  // (fetchHeatmapSeries' own cache still applies per key either way).
+  const dataList = await Promise.all(
+    pairs.map(({ product, response }) => fetchHeatmapSeries(`${product}_${response}`))
+  );
+
+  let xLabels, computeRow;
   if (heatmapState.family === "monthly") {
     const endDate = latestRecordEndMonth();
     const endYear = parseInt(endDate.slice(0, 4), 10);
@@ -133,8 +141,7 @@ async function renderHeatmap() {
       months.push({ year: y, month: m });
     }
     xLabels = months.map(({ year, month }) => `${MONTH_NAMES[month - 1].slice(0, 3)} ${year}`);
-    dataForRow = async ({ product, response }) => {
-      const data = await fetchHeatmapSeries(`${product}_${response}`);
+    computeRow = (data) => {
       const region = data.regions[heatmapState.region];
       if (!region) return months.map(() => null);
       // Flip sign so red always means "more stress" and blue always means
@@ -156,8 +163,7 @@ async function renderHeatmap() {
     const years = [];
     for (let y = minYear; y <= maxYear; y++) years.push(y);
     xLabels = years.map(String);
-    dataForRow = async ({ product, response }) => {
-      const data = await fetchHeatmapSeries(`${product}_${response}`);
+    computeRow = (data) => {
       const region = data.regions[heatmapState.region];
       if (!region) return years.map(() => null);
       // Same stress-direction sign flip as the "monthly" branch above.
@@ -170,19 +176,20 @@ async function renderHeatmap() {
   }
 
   const yLabels = [];
-  z = [];
+  const z = [];
   // Plotly's categorical y-axis renders array index 0 at the BOTTOM, so
   // pushing category_order's own top-to-bottom sequence (snow/climate first,
   // drought last) unreversed put drought at the top and snow at the bottom
   // -- backwards. Reverse once here, same fix already used by the About
   // page's coverage chart for the same reason.
-  for (const pair of [...pairs].reverse()) {
-    const row = await dataForRow(pair);
-    if (row.every((v) => v === null)) continue;
+  [...pairs].reverse().forEach((pair, i) => {
+    const data = dataList[pairs.length - 1 - i];
+    const row = computeRow(data);
+    if (row.every((v) => v === null)) return;
     const detrendMethod = findResponseEntry(pair.product, pair.response)?.detrend_method;
     yLabels.push(`${pair.product} ${pair.response}${detrendShortSuffix(detrendMethod)}`);
     z.push(row);
-  }
+  });
   if (z.length === 0) {
     chart.innerHTML = '<p class="chart-empty">No data for this selection.</p>';
     return;

@@ -135,26 +135,37 @@ async function renderSummaryTable() {
   const body = document.getElementById("summary-table-body");
   const colCount = 3 + summaryRegionColumns.length;
   body.innerHTML = `<tr><td colspan="${colCount}">Computing&hellip;</td></tr>`;
-  const rowsByCategory = {};
 
+  // Fetch every product's JSON concurrently instead of one at a time -- the
+  // full table is ~100 products, and awaiting each fetch in turn meant the
+  // table waited on ~100 sequential network round-trips before rendering
+  // anything (fetchSummaryData's own cache still applies per key, so a
+  // repeat render of the same window/year is unaffected either way).
+  const toFetch = [];
   for (const category of manifest.category_order) {
     const products = manifest.categories[category];
     for (const [product, responses] of Object.entries(products)) {
       for (const [response, entry] of Object.entries(responses)) {
         if (!entry.aggregation) continue; // no established aggregation rule (e.g. NEON NEE) -- excluded, not guessed
-        const data = await fetchSummaryData(product, response);
-        const cells = summaryRegionColumns.map((col) => {
-          const region = data.regions[col.code];
-          if (!region) return null;
-          return computeWindowValue(data, region, summaryState.window, summaryState.year);
-        });
-        if (cells.every((cell) => cell === null)) continue;
-        (rowsByCategory[category] = rowsByCategory[category] || []).push({
-          product, response, cells, detrendMethod: entry.detrend_method,
-        });
+        toFetch.push({ category, product, response, entry });
       }
     }
   }
+  const dataList = await Promise.all(toFetch.map((item) => fetchSummaryData(item.product, item.response)));
+
+  const rowsByCategory = {};
+  toFetch.forEach((item, i) => {
+    const data = dataList[i];
+    const cells = summaryRegionColumns.map((col) => {
+      const region = data.regions[col.code];
+      if (!region) return null;
+      return computeWindowValue(data, region, summaryState.window, summaryState.year);
+    });
+    if (cells.every((cell) => cell === null)) return;
+    (rowsByCategory[item.category] = rowsByCategory[item.category] || []).push({
+      product: item.product, response: item.response, cells, detrendMethod: item.entry.detrend_method,
+    });
+  });
 
   body.innerHTML = "";
   let anyRows = false;

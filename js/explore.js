@@ -555,18 +555,30 @@ async function renderCategoryOverlay() {
   );
   compareState.checkedByCategory[category] = checkedKey;
 
+  // Fetch every product's JSON concurrently instead of one at a time (plus
+  // each one's seasonal JSON too, for the vegetation category's growing-
+  // season mask) -- some categories have 15-27 products, and awaiting each
+  // fetch in turn meant a full re-render waited on that many sequential
+  // network round-trips (fetchCompareSeries/fetchCompareSeasonal's own
+  // caches still apply per key either way).
+  const seriesList = await Promise.all(
+    pairs.map(({ product, response }) => fetchCompareSeries(`${product}_${response}`))
+  );
+  const seasonalList = category === "vegetation"
+    ? await Promise.all(pairs.map(({ product, response }) => fetchCompareSeasonal(`${product}_${response}`)))
+    : null;
+
   const traces = [];
   const legendItems = [];
   let colorIndex = 0;
-  for (const { product, response } of pairs) {
-    const key = `${product}_${response}`;
-    const data = await fetchCompareSeries(key);
+  pairs.forEach(({ product, response }, pairIndex) => {
+    const data = seriesList[pairIndex];
     const region = data.regions[compareState.region];
-    if (!region) continue;
+    if (!region) return;
 
     let sigma = region.sigma;
     if (category === "vegetation") {
-      const seasonal = await fetchCompareSeasonal(key);
+      const seasonal = seasonalList[pairIndex];
       const seasonalRegion = seasonal && seasonal.regions[compareState.region];
       if (seasonalRegion) {
         const mean = seasonalRegion.climatology_mean;
@@ -597,7 +609,7 @@ async function renderCategoryOverlay() {
     });
     legendItems.push({ name, color, visible, pairKey });
     colorIndex++;
-  }
+  });
   Plotly.newPlot(chart, traces, { ...plotlyLayout(), showlegend: false }, { responsive: true, displaylogo: false });
   renderCategoryLegend(legendItems);
 }
