@@ -190,7 +190,23 @@ const COG_NODATA = -32768;
 // chunk of the value range compared to the pipeline's own static maps.
 // boundaries here is just [vmin, vmax]; colors is BASELINE_CMAP_HEX's many
 // stops, spread evenly across that range.
+//
+// GLSL stop cap: some style JSON ships a 256-stop palette, and an
+// "interpolate" expression with that many stops fails to compile on real
+// hardware ("Expression too complex", confirmed 2026-09 -- every Drought
+// Indices climatology map silently rendered nothing, just the basemap).
+// Linear interpolation between stops looks smooth on screen well below 256
+// -- subsample down to a safe count here rather than depend on every style
+// JSON already being capped server-side.
+const MAX_GRADIENT_STOPS = 32;
+
 function buildContinuousColorExpression(vmin, vmax, colors, scale) {
+  if (colors.length > MAX_GRADIENT_STOPS) {
+    colors = Array.from(
+      { length: MAX_GRADIENT_STOPS },
+      (_, i) => colors[Math.round((i / (MAX_GRADIENT_STOPS - 1)) * (colors.length - 1))],
+    );
+  }
   const band = ["band", 1];
   const value = ["/", band, scale];
   const interp = ["interpolate", ["linear"], value];
@@ -379,15 +395,23 @@ function updateYearControlForPeriod(slot) {
     sliderWrap.style.display = "none";
     return;
   }
-  sliderWrap.style.display = "inline-flex";
   const prefix = `${olMapState.mode}_`;
   const years = Object.keys(slot)
     .filter((k) => k.startsWith(prefix))
     .map((k) => parseInt(k.slice(prefix.length), 10))
     .sort((a, b) => a - b);
   olMapState.sliderYears = years;
+  // Not every product/period has this mode's COGs yet (e.g. the raw-value
+  // export is still mid-rollout) -- hide the slider entirely rather than
+  // show it stuck at an empty range with no year to pick.
+  if (years.length === 0) {
+    sliderWrap.style.display = "none";
+    olMapState.year = null;
+    return;
+  }
+  sliderWrap.style.display = "inline-flex";
   if (!years.includes(olMapState.year)) {
-    olMapState.year = years.length ? years[years.length - 1] : null;
+    olMapState.year = years[years.length - 1];
   }
   slider.min = "0";
   slider.max = String(Math.max(years.length - 1, 0));
@@ -456,12 +480,20 @@ async function updateInteractiveMapLayer() {
     : `${units} anomaly ${detrendBadgeHtml(entry.detrend_method)}`;
   const boundaries = fileEntry.boundaries;
   if (boundaries && isContinuous) {
-    // Baseline: boundaries is just [vmin, vmax] for a continuous ramp -- a
-    // handful of evenly-spaced tick labels alongside a smooth gradient bar,
-    // the same way a matplotlib continuous colorbar reads, not discrete
-    // swatches. Vertical, highest value at top, matching the anomaly legend
-    // below and every static map in the pipeline.
-    const [vmin, vmax] = boundaries;
+    // Baseline: a continuous ramp needs just [vmin, vmax] -- read as the
+    // first/last element, not literally boundaries[0]/boundaries[1]. Style
+    // JSON exported before this continuous-scale change still ships the
+    // OLD N_BINS+1-element linspace array here; boundaries[0] is the true
+    // vmin either way, but boundaries[1] in that old array is only 1/11th
+    // of the way to the true vmax, not the vmax itself -- reading it as
+    // vmax clipped nearly every real value to the top color (confirmed
+    // 2026-09: an ERA5-Land T2m climatology map rendered almost entirely
+    // one flat color). Evenly-spaced tick labels alongside a smooth
+    // gradient bar, the same way a matplotlib continuous colorbar reads,
+    // not discrete swatches. Vertical, highest value at top, matching the
+    // anomaly legend below and every static map in the pipeline.
+    const vmin = boundaries[0];
+    const vmax = boundaries[boundaries.length - 1];
     const N_TICKS = 6;
     const tickValues = Array.from({ length: N_TICKS }, (_, i) => vmin + (i / (N_TICKS - 1)) * (vmax - vmin));
     const decimals = pickTickDecimals(tickValues);
@@ -498,7 +530,7 @@ async function updateInteractiveMapLayer() {
   }
 
   const colorExpr = !boundaries ? null
-    : isContinuous ? buildContinuousColorExpression(boundaries[0], boundaries[1], palette, fileEntry.scale)
+    : isContinuous ? buildContinuousColorExpression(boundaries[0], boundaries[boundaries.length - 1], palette, fileEntry.scale)
     : buildBinnedColorExpression(boundaries, palette, fileEntry.scale);
 
   if (olMapState.rasterLayer) olMapState.map.removeLayer(olMapState.rasterLayer);
