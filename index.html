@@ -61,16 +61,14 @@
 
         <div class="map-controls">
           <select id="ol-period-select" aria-label="Month or season"></select>
-          <div class="series-toggle" id="ol-year-toggle">
-            <button data-year="baseline" class="active">Climatology</button>
-            <button data-year="2025">2025 anomaly</button>
-            <button data-year="2026">2026 anomaly</button>
+          <div class="series-toggle" id="ol-mode-toggle">
+            <button type="button" data-mode="climatology" class="active">Climatology</button>
+            <button type="button" data-mode="raw">Raw value</button>
+            <button type="button" data-mode="anomaly">Anomaly</button>
           </div>
           <div class="year-slider-wrap" id="ol-year-slider-wrap" style="display:none;">
-            <button type="button" data-year="baseline" id="ol-year-slider-baseline">Climatology</button>
-            <span class="year-slider-caption">or anomaly for year:</span>
             <span id="ol-year-slider-min" class="year-slider-bound"></span>
-            <input type="range" id="ol-year-slider" min="0" max="0" value="0" step="1" aria-label="Anomaly year">
+            <input type="range" id="ol-year-slider" min="0" max="0" value="0" step="1" aria-label="Year">
             <span id="ol-year-slider-max" class="year-slider-bound"></span>
             <span id="ol-year-slider-label" class="year-slider-value"></span>
           </div>

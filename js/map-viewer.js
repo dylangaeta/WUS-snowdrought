@@ -29,6 +29,16 @@ function parseSharedMapViewFromUrl() {
 let pendingSharedMapView = null;
 let lastMapSelection = null;
 
+// First-ever visit (no shared-view URL hash, no remembered localStorage
+// selection) opens on this view rather than whatever happens to sort first
+// in the manifest -- 2m air temperature is the most immediately legible
+// variable for a first-time visitor, and March 2026 is the dashboard's own
+// live season.
+const DEFAULT_MAP_VIEW = {
+  category: "climate", product: "ERA5-Land", response: "T2m",
+  period: "03", mode: "anomaly", year: "2026",
+};
+
 // A URL fragment-only change (e.g. an embedding iframe's src updated to a
 // new #category=...&product=...&response=... on the same index.html
 // document) does not reload the page or re-run init(), so it must be
@@ -46,7 +56,8 @@ function initMapPicker() {
   renderMapCategoryTabs();
   if (!applySharedMapView()) {
     lastMapSelection = loadLastSelection();
-    const preferredCategory = lastMapSelection?.category;
+    if (!lastMapSelection) pendingSharedMapView = DEFAULT_MAP_VIEW;
+    const preferredCategory = lastMapSelection?.category || pendingSharedMapView?.category;
     const initialCategory = (preferredCategory && manifest.categories[preferredCategory])
       ? preferredCategory
       : manifest.category_order.find((cat) => Object.keys(manifest.categories[cat]).length > 0);
@@ -126,12 +137,13 @@ function populateMapResponseSelect() {
 
   if (pendingSharedMapView) {
     if (pendingSharedMapView.period) olMapState.period = pendingSharedMapView.period;
-    if (pendingSharedMapView.year) {
-      olMapState.year = pendingSharedMapView.year;
-      document.querySelectorAll("#ol-year-toggle button").forEach((btn) => {
-        btn.classList.toggle("active", btn.dataset.year === pendingSharedMapView.year);
+    if (pendingSharedMapView.mode) {
+      olMapState.mode = pendingSharedMapView.mode;
+      document.querySelectorAll("#ol-mode-toggle button").forEach((btn) => {
+        btn.classList.toggle("active", btn.dataset.mode === pendingSharedMapView.mode);
       });
     }
+    if (pendingSharedMapView.year) olMapState.year = parseInt(pendingSharedMapView.year, 10);
     pendingSharedMapView = null; // restore only on initial load, never again
   }
   lastMapSelection = null; // consumed as a one-time fallback, same as pendingSharedMapView
@@ -150,8 +162,9 @@ const olMapState = {
   rasterLayer: null,
   boundaryLayer: null,
   period: null,
-  year: "baseline",
-  lastAnomalyYear: null, // remembered so the Climatology button can toggle back to it
+  mode: "climatology", // "climatology" | "raw" | "anomaly" -- one consistent control for every period
+  year: null, // only meaningful when mode !== "climatology"
+  sliderYears: [],
   styleCache: {},
   currentStyle: null,
   currentCogUrl: null,
@@ -170,6 +183,24 @@ const COG_NODATA = -32768;
 // WebGLTile+GeoTIFF is the stable, working combination once geotiff.js
 // (the separate TIFF-decoding library ol.source.GeoTIFF depends on at
 // runtime) is loaded alongside ol.js -- see index.html's <script> tags.
+// Baseline/climatology maps get a smooth linear color ramp instead of
+// discrete bins -- common/maps.py's own _scale() uses a plain continuous
+// Normalize(vmin, vmax) for any non-signed field (never a BoundaryNorm), so
+// binning this into a handful of swatches made each one span a visibly wide
+// chunk of the value range compared to the pipeline's own static maps.
+// boundaries here is just [vmin, vmax]; colors is BASELINE_CMAP_HEX's many
+// stops, spread evenly across that range.
+function buildContinuousColorExpression(vmin, vmax, colors, scale) {
+  const band = ["band", 1];
+  const value = ["/", band, scale];
+  const interp = ["interpolate", ["linear"], value];
+  const n = colors.length;
+  for (let i = 0; i < n; i++) {
+    interp.push(vmin + (i / (n - 1)) * (vmax - vmin), colors[i]);
+  }
+  return ["case", ["==", ["band", 2], 0], ["color", 0, 0, 0, 0], interp];
+}
+
 function buildBinnedColorExpression(boundaries, colors, scale) {
   const band = ["band", 1];
   const value = ["/", band, scale];
@@ -250,34 +281,19 @@ function initInteractiveMap() {
     olMapState.period = event.target.value;
     updateInteractiveMapLayer();
   });
-  document.getElementById("ol-year-toggle").addEventListener("click", (event) => {
-    const button = event.target.closest("button[data-year]");
+  document.getElementById("ol-mode-toggle").addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-mode]");
     if (!button || button.disabled) return;
-    olMapState.year = button.dataset.year;
-    document.querySelectorAll("#ol-year-toggle button").forEach((btn) => btn.classList.toggle("active", btn === button));
+    olMapState.mode = button.dataset.mode;
+    document.querySelectorAll("#ol-mode-toggle button").forEach((btn) => btn.classList.toggle("active", btn === button));
     updateInteractiveMapLayer();
   });
   document.getElementById("ol-year-slider").addEventListener("input", (event) => {
     const years = olMapState.sliderYears || [];
     const year = years[parseInt(event.target.value, 10)];
     if (year === undefined) return;
-    olMapState.year = String(year);
-    const label = document.getElementById("ol-year-slider-label");
-    label.textContent = olMapState.year;
-    label.classList.remove("inactive");
-    document.getElementById("ol-year-slider-baseline").classList.remove("active");
-    event.target.classList.add("active");
-    updateInteractiveMapLayer();
-  });
-  document.getElementById("ol-year-slider-baseline").addEventListener("click", () => {
-    // Toggle: clicking Climatology while already on it restores whichever
-    // anomaly year was showing before, instead of being a dead-end click.
-    if (olMapState.year === "baseline") {
-      if (olMapState.lastAnomalyYear !== null) olMapState.year = olMapState.lastAnomalyYear;
-    } else {
-      olMapState.lastAnomalyYear = olMapState.year;
-      olMapState.year = "baseline";
-    }
+    olMapState.year = year;
+    document.getElementById("ol-year-slider-label").textContent = String(year);
     updateInteractiveMapLayer();
   });
   document.getElementById("ol-boundary-toggle").addEventListener("change", (event) => {
@@ -345,51 +361,41 @@ async function fetchMapStyle(product, response) {
   return olMapState.styleCache[key];
 }
 
-// DJFM (this project's own flagship winter window) is exported with a COG
-// for every year in each product's record, not just baseline/2025/2026 --
-// see code/17_dashboard_cog_export.py's matching SLIDER_PERIODS. Every
-// other period keeps the plain 3-button toggle.
-const SLIDER_PERIODS = ["DJFM"];
-
+// Every period (all months + all seasons) now carries a raw_<year> and
+// anomaly_<year> COG for every year in the record -- see
+// code/17_dashboard_cog_export.py's export_one(). One control shape works
+// for every period: Climatology has no year (the slider hides); Raw/Anomaly
+// show a year slider scoped to whichever years that mode's COGs actually
+// cover for this specific period/product (gaps are real -- e.g. a product's
+// own record start -- not guessed).
 function updateYearControlForPeriod(slot) {
-  const toggle = document.getElementById("ol-year-toggle");
   const sliderWrap = document.getElementById("ol-year-slider-wrap");
   const slider = document.getElementById("ol-year-slider");
   const label = document.getElementById("ol-year-slider-label");
   const minBound = document.getElementById("ol-year-slider-min");
   const maxBound = document.getElementById("ol-year-slider-max");
-  const baselineBtn = document.getElementById("ol-year-slider-baseline");
 
-  if (!SLIDER_PERIODS.includes(olMapState.period)) {
-    toggle.style.display = "";
+  if (olMapState.mode === "climatology") {
     sliderWrap.style.display = "none";
-    if (!["baseline", "2025", "2026"].includes(olMapState.year)) olMapState.year = "baseline";
     return;
   }
-
-  toggle.style.display = "none";
   sliderWrap.style.display = "inline-flex";
+  const prefix = `${olMapState.mode}_`;
   const years = Object.keys(slot)
-    .filter((k) => k.startsWith("anomaly_"))
-    .map((k) => parseInt(k.slice("anomaly_".length), 10))
+    .filter((k) => k.startsWith(prefix))
+    .map((k) => parseInt(k.slice(prefix.length), 10))
     .sort((a, b) => a - b);
   olMapState.sliderYears = years;
-  if (olMapState.year !== "baseline" && !years.includes(parseInt(olMapState.year, 10))) {
-    olMapState.year = years.length ? String(years[years.length - 1]) : "baseline";
+  if (!years.includes(olMapState.year)) {
+    olMapState.year = years.length ? years[years.length - 1] : null;
   }
   slider.min = "0";
   slider.max = String(Math.max(years.length - 1, 0));
   minBound.textContent = years.length ? String(years[0]) : "";
   maxBound.textContent = years.length ? String(years[years.length - 1]) : "";
-  const currentIndex = olMapState.year === "baseline" ? years.length - 1 : years.indexOf(parseInt(olMapState.year, 10));
+  const currentIndex = years.indexOf(olMapState.year);
   slider.value = String(Math.max(currentIndex, 0));
-  // Always show a real year (never blank) so the slider reads as labeled
-  // even in Climatology mode -- "inactive" styling communicates that this
-  // parked year isn't the one currently on the map.
-  label.textContent = String(years[Math.max(currentIndex, 0)] ?? "");
-  label.classList.toggle("inactive", olMapState.year === "baseline");
-  baselineBtn.classList.toggle("active", olMapState.year === "baseline");
-  slider.classList.toggle("active", olMapState.year !== "baseline");
+  label.textContent = olMapState.year !== null ? String(olMapState.year) : "";
 }
 
 async function updateInteractiveMapLayer() {
@@ -404,7 +410,7 @@ async function updateInteractiveMapLayer() {
   }
   const slot = style.periods[olMapState.period];
   updateYearControlForPeriod(slot);
-  const key = olMapState.year === "baseline" ? "baseline" : `anomaly_${olMapState.year}`;
+  const key = olMapState.mode === "climatology" ? "baseline" : `${olMapState.mode}_${olMapState.year}`;
   const fileEntry = slot[key];
   if (!fileEntry) {
     wrap.style.display = "none";
@@ -420,7 +426,7 @@ async function updateInteractiveMapLayer() {
   olMapState.currentScale = fileEntry.scale;
   document.getElementById("ol-geotiff-link").href = url;
   document.getElementById("ol-geotiff-link").setAttribute(
-    "download", `${mapPickerState.product}_${mapPickerState.response}_${olMapState.period}_${olMapState.year}.tif`
+    "download", `${mapPickerState.product}_${mapPickerState.response}_${olMapState.period}_${mapViewSuffix()}.tif`
   );
 
   const source = new ol.source.GeoTIFF({
@@ -437,15 +443,37 @@ async function updateInteractiveMapLayer() {
 
   const legend = document.getElementById("ol-legend");
   const units = entry.units || "";
-  const isBaseline = olMapState.year === "baseline";
-  const palette = isBaseline ? style.baseline_colors : style.anomaly_colors;
+  // Climatology and Raw value are both the same physical field (one a
+  // multi-year mean, one a single year) and share the continuous scale +
+  // uniform sequential palette; only Anomaly is a signed departure with its
+  // own discrete diverging bins.
+  const isContinuous = olMapState.mode !== "anomaly";
+  const palette = isContinuous ? style.baseline_colors : style.anomaly_colors;
   // Detrend status only describes how the anomaly was computed -- not
-  // meaningful for the raw climatology view, so the badge only shows there.
-  const label = isBaseline
-    ? `Climatology (${units})`
+  // meaningful for the climatology/raw views, so the badge only shows there.
+  const label = olMapState.mode === "climatology" ? `Climatology (${units})`
+    : olMapState.mode === "raw" ? `${olMapState.year} (${units})`
     : `${units} anomaly ${detrendBadgeHtml(entry.detrend_method)}`;
   const boundaries = fileEntry.boundaries;
-  if (boundaries) {
+  if (boundaries && isContinuous) {
+    // Baseline: boundaries is just [vmin, vmax] for a continuous ramp -- a
+    // handful of evenly-spaced tick labels alongside a smooth gradient bar,
+    // the same way a matplotlib continuous colorbar reads, not discrete
+    // swatches. Vertical, highest value at top, matching the anomaly legend
+    // below and every static map in the pipeline.
+    const [vmin, vmax] = boundaries;
+    const N_TICKS = 6;
+    const tickValues = Array.from({ length: N_TICKS }, (_, i) => vmin + (i / (N_TICKS - 1)) * (vmax - vmin));
+    const decimals = pickTickDecimals(tickValues);
+    const ticks = tickValues.slice().reverse().map((v, i) => {
+      const top = (i / (N_TICKS - 1)) * 100;
+      return `<span class="ol-legend-gradient-tick" style="top:${top}%">${v.toFixed(decimals)}</span>`;
+    }).join("");
+    const gradient = `linear-gradient(to top, ${palette.join(", ")})`;
+    legend.innerHTML = `<div class="ol-legend-label">${label}</div>` +
+      `<div class="ol-legend-gradient-wrap"><div class="ol-legend-gradient" style="background:${gradient}"></div>` +
+      `<div class="ol-legend-gradient-ticks">${ticks}</div></div>`;
+  } else if (boundaries) {
     const nBins = boundaries.length - 1;
     // Matches common/maps.py's _label_colorbar exactly: one tick per bin,
     // centered on the swatch it labels, not one tick per boundary -- reads
@@ -469,7 +497,9 @@ async function updateInteractiveMapLayer() {
     legend.innerHTML = `<div class="ol-legend-label">${units} ${detrendBadgeHtml(entry.detrend_method)}</div>`;
   }
 
-  const colorExpr = boundaries ? buildBinnedColorExpression(boundaries, palette, fileEntry.scale) : null;
+  const colorExpr = !boundaries ? null
+    : isContinuous ? buildContinuousColorExpression(boundaries[0], boundaries[1], palette, fileEntry.scale)
+    : buildBinnedColorExpression(boundaries, palette, fileEntry.scale);
 
   if (olMapState.rasterLayer) olMapState.map.removeLayer(olMapState.rasterLayer);
   olMapState.rasterLayer = new ol.layer.WebGLTile({
@@ -564,7 +594,7 @@ function takeMapScreenshot() {
     });
     mapContext.setTransform(1, 0, 0, 1, 0, 0);
     const link = document.createElement("a");
-    link.download = `${mapPickerState.product}_${mapPickerState.response}_${olMapState.period}_${olMapState.year}.png`;
+    link.download = `${mapPickerState.product}_${mapPickerState.response}_${olMapState.period}_${mapViewSuffix()}.png`;
     link.href = mapCanvas.toDataURL();
     link.click();
 
@@ -581,11 +611,16 @@ function copyToClipboard(text) {
   navigator.clipboard.writeText(text).catch(() => {});
 }
 
+function mapViewSuffix() {
+  return olMapState.mode === "climatology" ? "climatology" : `${olMapState.mode}_${olMapState.year}`;
+}
+
 function copyViewLink() {
   const params = new URLSearchParams({
     category: mapPickerState.category, product: mapPickerState.product,
-    response: mapPickerState.response, period: olMapState.period, year: olMapState.year,
+    response: mapPickerState.response, period: olMapState.period, mode: olMapState.mode,
   });
+  if (olMapState.year !== null) params.set("year", String(olMapState.year));
   const url = `${window.location.origin}${window.location.pathname}#${params.toString()}`;
   copyToClipboard(url);
 }

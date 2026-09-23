@@ -10,12 +10,19 @@ const SEASON_LABELS = {
   MAM: "Mar–May", JJA: "Jun–Aug", SON: "Sep–Nov",
   DJF: "Dec–Feb", NDJF: "Nov–Feb",
   DJFM: "Dec–Mar", AMJJ: "Apr–Jul",
+  MAMJJAS: "Mar–Sep", ANNUAL: "Jan–Dec",
 };
-const SEASON_ORDER = ["NDJF", "DJFM", "DJF", "MAM", "AMJJ", "JJA", "SON"];
-// Mirrors config.py's MAP_SEASONAL_PERIODS exactly -- do not diverge.
+const SEASON_ORDER = ["NDJF", "DJFM", "DJF", "MAM", "AMJJ", "MAMJJAS", "JJA", "SON", "ANNUAL"];
+// Mirrors config.py's MAP_SEASONAL_PERIODS -- do not diverge for any window
+// also used by the interactive map's period select (built server-side from
+// that same dict, see code/17_dashboard_cog_export.py's SEASON_MONTHS).
+// MAMJJAS/ANNUAL are dashboard-only additions with no COG coverage yet --
+// they work everywhere else (summary table, heatmaps, compare) because
+// those are computed live from monthly timeseries JSON, not pre-rendered maps.
 const SEASON_MONTHS = {
   MAM: [3, 4, 5], JJA: [6, 7, 8], SON: [9, 10, 11],
   DJF: [12, 1, 2], NDJF: [11, 12, 1, 2], DJFM: [12, 1, 2, 3], AMJJ: [4, 5, 6, 7],
+  MAMJJAS: [3, 4, 5, 6, 7, 8, 9], ANNUAL: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
 };
 
 // Mirrors config.py's PRODUCT_OBSERVATION_KIND exactly -- do not diverge.
@@ -120,7 +127,11 @@ const MIN_BASELINE_YEARS = 3;
 
 function windowMonthYearPairs(windowKey, targetYear) {
   const months = SEASON_MONTHS[windowKey] || [parseInt(windowKey, 10)];
-  const crossesNewYear = months.includes(1) && months.some((m) => m >= 10);
+  // A window spanning all 12 months (ANNUAL) always has both January and
+  // October-December present, but it's a single calendar year, not a
+  // Dec->Jan wrap -- the length check disambiguates it from a genuine
+  // winter window like NDJF/DJF/DJFM.
+  const crossesNewYear = months.length < 12 && months.includes(1) && months.some((m) => m >= 10);
   return months.map((month) => ({
     month,
     year: crossesNewYear && month >= 10 ? targetYear - 1 : targetYear,
