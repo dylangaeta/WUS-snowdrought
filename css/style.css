@@ -367,7 +367,6 @@ table.headline-table td.window-growing { background: #fbe2ec; color: #7a1240; fo
 .selector-row select:focus-visible { border-color: var(--blue); box-shadow: var(--shadow-focus); outline: none; }
 
 .value-glossary { font-size: 0.85rem; color: var(--text-muted); margin: -0.4rem 0 1rem; font-style: italic; }
-.compare-pickers select { min-width: 220px; }
 
 /* "By category" Compare mode: real checkboxes next to each variable instead
    of Plotly's own built-in legend -- with ~15-27 products in some
@@ -430,34 +429,6 @@ table.headline-table td.window-growing { background: #fbe2ec; color: #7a1240; fo
   padding: 0.75rem;
 }
 .map-image-wrap img { max-width: 100%; height: auto; border-radius: var(--radius-sm); }
-.embedded-map-note { font-size: 0.9rem; color: var(--text-muted); margin-bottom: 0.5rem; }
-body.embedded .site-header { display: none; }
-body.embedded main { padding: 0.5rem; }
-/* index.html's own heading/intro/search/category-tabs/product picker (plus
-   its footer and "see also" line, now that the homepage carries those too)
-   are all redundant with the page already embedding it (Explore already has
-   its own picker and passes the selection via URL hash) -- shown, they
-   doubled the page inside the iframe and forced an internal scrollbar
-   ("buried in a scrollable box"). Only the map itself + its own per-view
-   controls stay. */
-body.embedded #interactive-maps > h2,
-body.embedded #interactive-maps > p,
-body.embedded .product-search-wrap,
-body.embedded .category-tabs,
-body.embedded .selector-row,
-body.embedded .product-meta,
-body.embedded .see-also,
-body.embedded .site-footer {
-  display: none;
-}
-body.embedded .explorer-layout { grid-template-columns: 1fr; gap: 0; }
-.embedded-map-iframe {
-  width: 100%;
-  min-height: 300px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-sm);
-}
 .finding-card h3 { margin-top: 0; }
 .finding-note { color: var(--text-muted); font-size: 0.9rem; margin-top: 0.6rem; margin-bottom: 0; }
 /* Matches code/11_context_SnowDroughtQuadrants_analyze.py's own

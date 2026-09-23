@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Regional summary table and cross-product anomaly heatmaps for every dataset in the Western US snow drought pipeline.">
+<title>Dataset Explorer &mdash; 2025-2026 Western US Climate and Snow Drought Explorer</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg stroke='%23162e51' stroke-width='2' stroke-linecap='round'%3E%3Cline x1='12' y1='2' x2='12' y2='22'/%3E%3Cline x1='4' y1='6' x2='20' y2='18'/%3E%3Cline x1='4' y1='18' x2='20' y2='6'/%3E%3C/g%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@400;600;700&family=Merriweather:wght@700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="header-inner">
+    <h1 class="wordmark-h1"><a class="wordmark" href="index.html">Western US Climate and Snow Drought Explorer <span class="beta-tag">BETA</span>
+      <small>NOAA Global Monitoring Laboratory &middot; Cooperative Institute for Research in Environmental Sciences</small>
+      <small>Unofficial snow drought dashboard and data explorer. For educational purposes only</small>
+    </a></h1>
+    <nav class="site-nav">
+      <a href="index.html">Home</a>
+      <a href="findings.html">Key Findings</a>
+      <a href="explore.html">Explore the data</a>
+      <a href="data.html" class="active">Dataset explorer</a>
+      <a href="about.html">About</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+
+  <section class="panel" id="summary">
+    <h2>Regional summary vs. fixed calendar-month climatology</h2>
+    <p>
+      Computed on demand from the same monthly grid-cell-detrended values as
+      the <a href="explore.html">product explorer</a> &mdash; pick any month
+      or season window, any year, and which value to display. Color = each
+      variable's own physical direction of stress (not raw arithmetic sign)
+      &mdash;
+      <span style="color:#a0290f; font-weight:600;">stress</span>
+      (drier/hotter/less productive) vs.
+      <span style="color:#205493; font-weight:600;">relief</span>.
+      Native standardized indices (SPI/SPEI/EDDI/PDSI/ForDRI/ESI) already
+      are their own fixed-timescale statistic (e.g. SPI-03 is inherently a
+      trailing 3-month index), so for a season window they show their own
+      reading as of that window's last month rather than being re-aggregated
+      across it &mdash; labeled "as of &lt;month&gt;" when that applies.
+      Percent-of-normal is not shown for them, and is omitted wherever a
+      baseline mean near zero (e.g. some temperature/VPD anomaly fields)
+      would make it unstable.
+    </p>
+    <div class="selector-row">
+      <select id="summary-region-group-select" aria-label="Regions">
+        <option value="summary" selected>Regions</option>
+        <option value="states">States</option>
+        <option value="huc2">HUC2 regions</option>
+      </select>
+      <select id="summary-window-select" aria-label="Window"></select>
+      <select id="summary-year-select" aria-label="Year"></select>
+      <select id="summary-value-select" aria-label="Value to display">
+        <option value="sigma" selected>Standardized anomaly (&sigma;)</option>
+        <option value="percentile">Percentile</option>
+        <option value="raw">Raw value</option>
+        <option value="percent_of_normal">Percent of normal</option>
+      </select>
+    </div>
+    <p id="summary-value-glossary" class="value-glossary"></p>
+    <div style="overflow-x:auto;">
+      <table class="headline-table" id="summary-table">
+        <thead>
+          <tr id="summary-table-header"><th>Variable</th><th>Product</th><th>Detrended?</th></tr>
+        </thead>
+        <tbody id="summary-table-body">
+          <tr><td colspan="3">Loading&hellip;</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="heatmaps">
+    <h2>Anomaly heatmaps by product and time</h2>
+    <p>Every product's standardized anomaly (&sigma;) from its own baseline,
+      one row per product/response, one column per month or year depending
+      on the period selected below -- computed live the same way as every
+      other chart on this dashboard, not a static image. Colored by stress
+      direction, not raw sign: red always means more stress and blue always
+      means less, so a row is sign-flipped when its own physical variable's
+      stress direction is negative (e.g. low snowpack, not high).</p>
+    <div class="explorer-layout">
+      <nav class="category-tabs" id="heatmap-category-tabs" aria-label="Category"></nav>
+
+      <div>
+        <div class="selector-row">
+          <select id="heatmap-family-select" aria-label="Heatmap family"></select>
+          <select id="heatmap-region-select" aria-label="Region"></select>
+        </div>
+        <div id="heatmap-chart"></div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="footer-inner">
+    <p>
+      Source pipeline: snowdrought-carbon (private research repository, NOAA
+      Global Monitoring Laboratory &middot; Cooperative Institute for
+      Research in Environmental Sciences). See <a href="about.html">About</a>
+      for methodology, references, and contact information.
+    </p>
+  </div>
+</footer>
+
+<script src="js/common.js"></script>
+<script src="js/summary.js"></script>
+<script src="js/heatmaps.js"></script>
+</body>
+</html>

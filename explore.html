@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="description" content="Regional summary tables, monthly time series, seasonal cycles, interactive maps, and cross-product comparisons for every dataset in the Western US snow drought pipeline.">
+<meta name="description" content="Monthly time series, seasonal cycles, and cross-product comparisons for every dataset in the Western US snow drought pipeline.">
 <title>Explore the Data &mdash; 2025-2026 Western US Climate and Snow Drought Explorer</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg stroke='%23162e51' stroke-width='2' stroke-linecap='round'%3E%3Cline x1='12' y1='2' x2='12' y2='22'/%3E%3Cline x1='4' y1='6' x2='20' y2='18'/%3E%3Cline x1='4' y1='18' x2='20' y2='6'/%3E%3C/g%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -23,6 +23,7 @@
       <a href="index.html">Home</a>
       <a href="findings.html">Key Findings</a>
       <a href="explore.html" class="active">Explore the data</a>
+      <a href="data.html">Dataset explorer</a>
       <a href="about.html">About</a>
     </nav>
   </div>
@@ -30,63 +31,15 @@
 
 <main>
 
-  <section class="panel" id="summary">
-    <h2>Regional summary vs. fixed calendar-month climatology</h2>
-    <p>
-      Computed on demand from the same monthly grid-cell-detrended values as
-      the product explorer below &mdash; pick any month or season window, any
-      year, and which value to display. Color = each variable's own physical
-      direction of stress (not raw arithmetic sign) &mdash;
-      <span style="color:#a0290f; font-weight:600;">stress</span>
-      (drier/hotter/less productive) vs.
-      <span style="color:#205493; font-weight:600;">relief</span>.
-      Native standardized indices (SPI/SPEI/EDDI/PDSI/ForDRI/ESI) already
-      are their own fixed-timescale statistic (e.g. SPI-03 is inherently a
-      trailing 3-month index), so for a season window they show their own
-      reading as of that window's last month rather than being re-aggregated
-      across it &mdash; labeled "as of &lt;month&gt;" when that applies.
-      Percent-of-normal is not shown for them, and is omitted wherever a
-      baseline mean near zero (e.g. some temperature/VPD anomaly fields)
-      would make it unstable.
-    </p>
-    <div class="selector-row">
-      <select id="summary-region-group-select" aria-label="Regions">
-        <option value="summary" selected>Regions</option>
-        <option value="states">States</option>
-        <option value="huc2">HUC2 regions</option>
-      </select>
-      <select id="summary-window-select" aria-label="Window"></select>
-      <select id="summary-year-select" aria-label="Year"></select>
-      <select id="summary-value-select" aria-label="Value to display">
-        <option value="sigma" selected>Standardized anomaly (&sigma;)</option>
-        <option value="percentile">Percentile</option>
-        <option value="raw">Raw value</option>
-        <option value="percent_of_normal">Percent of normal</option>
-      </select>
-    </div>
-    <p id="summary-value-glossary" class="value-glossary"></p>
-    <div style="overflow-x:auto;">
-      <table class="headline-table" id="summary-table">
-        <thead>
-          <tr id="summary-table-header"><th>Variable</th><th>Product</th><th>Detrended?</th></tr>
-        </thead>
-        <tbody id="summary-table-body">
-          <tr><td colspan="3">Loading&hellip;</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </section>
-
-  <p class="see-also">Full dataset references and methodology notes: see the <a href="about.html">About</a> page.</p>
-
   <section id="explorer">
     <h2>Explore the data</h2>
     <p>Every canonical dataset in the pipeline: pick a category, product, and
-      variable, then switch between the map, time series, and seasonal-cycle
-      views. Anomalies are always relative to each product's own fixed
-      calendar-month climatology &mdash; never a year-against-year comparison.
-      For the full pannable, zoomable, click-to-query map experience, see the
-      <a href="index.html">Home</a> page.</p>
+      variable, then switch between time series and seasonal-cycle views.
+      Anomalies are always relative to each product's own fixed
+      calendar-month climatology &mdash; never a year-against-year
+      comparison. For the interactive map, see the
+      <a href="index.html">Home</a> page; for the regional summary table and
+      cross-product heatmaps, see <a href="data.html">Dataset explorer</a>.</p>
 
     <div class="product-search-wrap">
       <input type="search" id="product-search" placeholder="Search products (e.g. &quot;snow water equivalent&quot;, &quot;PRISM&quot;)..." aria-label="Search products">
@@ -105,17 +58,11 @@
         <div class="product-meta" id="product-meta"></div>
 
         <div class="view-tabs" id="view-tabs">
-          <button data-view="map" class="active">Map</button>
-          <button data-view="timeseries">Time series</button>
+          <button data-view="timeseries" class="active">Time series</button>
           <button data-view="seasonal">Seasonal cycle</button>
         </div>
 
-        <div class="view-panel active" id="panel-map">
-          <p class="embedded-map-note">The same interactive map as the <a href="index.html" id="map-panel-open-link" target="_blank">Home</a> page, opened to this product &mdash; pan, zoom, and click to read a pixel value.</p>
-          <iframe id="map-panel-iframe" class="embedded-map-iframe" title="Interactive map" loading="lazy"></iframe>
-        </div>
-
-        <div class="view-panel" id="panel-timeseries">
+        <div class="view-panel active" id="panel-timeseries">
           <div class="selector-row">
             <div class="series-toggle" id="timeseries-toggle">
               <button data-series="value" class="active">Raw</button>
@@ -153,48 +100,13 @@
       &sigma; removes each variable's own physical units, leaving only how
       far each one departs from its own baseline.</p>
     <div class="selector-row">
-      <div class="series-toggle" id="compare-mode-toggle">
-        <button type="button" data-mode="category" class="active">By category (all products)</button>
-        <button type="button" data-mode="custom">Custom (pick up to 3)</button>
-      </div>
+      <select id="compare-category-select" aria-label="Category"></select>
       <select id="compare-region-select" aria-label="Region"></select>
     </div>
-    <div class="selector-row" id="compare-category-row">
-      <select id="compare-category-select" aria-label="Category"></select>
-    </div>
     <p id="compare-category-note" class="value-glossary"></p>
-    <div class="selector-row compare-pickers" id="compare-custom-row" style="display:none;">
-      <select id="compare-select-0" aria-label="Variable 1"></select>
-      <select id="compare-select-1" aria-label="Variable 2"></select>
-      <select id="compare-select-2" aria-label="Variable 3"></select>
-      <button type="button" id="compare-preset-snowdrought" class="preset-button">Snow drought ingredients (SWE, precipitation, temperature)</button>
-    </div>
     <div class="compare-chart-layout">
       <div id="compare-chart" style="height:480px;"></div>
       <div id="compare-category-legend" class="compare-legend"></div>
-    </div>
-  </section>
-
-  <section id="heatmaps">
-    <h2>Anomaly heatmaps by product and time</h2>
-    <p>Every product's standardized anomaly (&sigma;) from its own baseline,
-      one row per product/response, one column per month or year depending
-      on the period selected below -- computed live the same way as every
-      other chart on this page, not a static image. Colored by stress
-      direction, not raw sign: red always means more stress and blue always
-      means less, so a row is sign-flipped when its own physical variable's
-      stress direction is negative (e.g. low snowpack, not high) -- the same
-      convention the "By category" Compare view uses.</p>
-    <div class="explorer-layout">
-      <nav class="category-tabs" id="heatmap-category-tabs" aria-label="Category"></nav>
-
-      <div>
-        <div class="selector-row">
-          <select id="heatmap-family-select" aria-label="Heatmap family"></select>
-          <select id="heatmap-region-select" aria-label="Region"></select>
-        </div>
-        <div id="heatmap-chart"></div>
-      </div>
     </div>
   </section>
 
@@ -212,7 +124,6 @@
 </footer>
 
 <script src="js/common.js"></script>
-<script src="js/summary.js"></script>
 <script src="js/explore.js"></script>
 </body>
 </html>

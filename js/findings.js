@@ -2,12 +2,13 @@
 // computed live from the same JSON every other page uses. The pipeline's
 // cross-product combined-overlay and monthly-anomaly-heatmap questions
 // (formerly static PNGs) are answered by the *same* dynamic components
-// already built on explore.html (Compare's "By category" mode, Heatmaps),
-// not reimplemented a second time here -- one implementation, no risk of
-// the two views drifting apart. This page only holds visualizations that
-// don't already live elsewhere: the snow-drought quadrant classification,
-// below. (The observational-coverage timeline used to live here too --
-// moved to about.html, since it's a dataset/reference fact, not a finding.)
+// already built elsewhere (explore.html's Compare variables, data.html's
+// Heatmaps), not reimplemented a second time here -- one implementation, no
+// risk of the two views drifting apart. This page only holds visualizations
+// that don't already live elsewhere: the snow-drought quadrant
+// classification, below. (The observational-coverage timeline used to live
+// here too -- moved to about.html, since it's a dataset/reference fact, not
+// a finding.)
 
 // Snow-drought quadrant classification -- mirrors
 // code/11_context_SnowDroughtQuadrants_analyze.py's VARIABLES/REGIMES/

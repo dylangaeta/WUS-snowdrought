@@ -1,5 +1,5 @@
-// Homepage summary table. Computed entirely client-side from the same
-// monthly grid-cell-detrended anomaly arrays the Explore page uses -- no new
+// Regional summary table (data.html). Computed entirely client-side from the
+// same monthly grid-cell-detrended anomaly arrays the Explore page uses -- no new
 // statistics invented here. Each response's multi-month aggregation rule
 // (sum / mean / day_weighted_mean / native_index) comes from
 // code/14_dashboard_export.py's AGGREGATION_RULE, audited against each
@@ -198,7 +198,7 @@ async function renderSummaryTable() {
   }
 }
 
-// No self-invoking init here -- this now shares explore.html with
-// js/explore.js, which owns the single loadManifest() call and calls
-// initSummaryTable() itself (calling loadManifest() twice would double the
-// 342KB manifest fetch for no reason).
+// No self-invoking init here -- this shares data.html with js/heatmaps.js,
+// which owns the single loadManifest() call and calls initSummaryTable()
+// itself (calling loadManifest() twice would double the 342KB manifest
+// fetch for no reason).

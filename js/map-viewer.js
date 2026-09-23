@@ -1,13 +1,11 @@
 // Interactive COG map viewer (OpenLayers, global `ol` UMD bundle from CDN).
-// Lives on the homepage (index.html) with its own category/product/response
-// picker -- mirrors "Explore the data"'s picker (js/explore.js's
-// explorerState) but is entirely independent since the two pages never load
-// together (Explore embeds this same page in an iframe instead). Colors are
-// never computed in JS: every value comes from the per-product style JSON
-// exported by code/17_dashboard_cog_export.py (same boundaries/colors the
-// pipeline's own PNG maps use, via common/maps.py's _diverging_bins +
-// config.py's response_anomaly_cmap -- ported once server-side, not
-// re-derived here).
+// Lives on the homepage (index.html) only, with its own category/product/
+// response picker -- mirrors "Explore the data"'s picker (js/explore.js's
+// explorerState) but is entirely independent. Colors are never computed in
+// JS: every value comes from the per-product style JSON exported by
+// code/17_dashboard_cog_export.py (same boundaries/colors the pipeline's own
+// PNG maps use, via common/maps.py's _diverging_bins + config.py's
+// response_anomaly_cmap -- ported once server-side, not re-derived here).
 
 const mapPickerState = { category: null, product: null, response: null };
 
@@ -39,11 +37,10 @@ const DEFAULT_MAP_VIEW = {
   period: "03", mode: "anomaly", year: "2026",
 };
 
-// A URL fragment-only change (e.g. an embedding iframe's src updated to a
-// new #category=...&product=...&response=... on the same index.html
-// document) does not reload the page or re-run init(), so it must be
-// re-applied explicitly via the hashchange event below -- confirmed missing
-// in real embedding testing, 2026-09.
+// A URL fragment-only change (e.g. a shared link pasted into the same tab,
+// or browser back/forward across two hash states) does not reload the page
+// or re-run init(), so it must be re-applied explicitly via the hashchange
+// event below.
 function applySharedMapView() {
   const view = parseSharedMapViewFromUrl();
   if (!view || !manifest.categories[view.category]) return false;
@@ -658,12 +655,6 @@ function copyViewLink() {
 }
 
 async function init() {
-  // ?embed=1 (set by js/explore.js's renderMap() iframe) hides the page
-  // chrome duplicated from whichever page is embedding this map -- the
-  // interactive map itself is otherwise identical, same URL-hash state.
-  if (new URLSearchParams(window.location.search).get("embed") === "1") {
-    document.body.classList.add("embedded");
-  }
   await loadManifest();
   initMapPicker();
 }
