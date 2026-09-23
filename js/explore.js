@@ -551,16 +551,22 @@ async function renderCategoryOverlay() {
 // ---------------------------------------------------------------- Heatmaps
 //
 // Product x time standardized-anomaly matrix, computed dynamically from the
-// same data every other chart on this page uses -- not a static image. Two
-// families: "monthly" (direct per-month sigma, the most recent 12 months
-// available) and "ndjf_winter" (each winter's NDJF sigma via the same
-// window-aggregation + non-parametric standardization used by the homepage
-// summary table -- see computeWindowValue() in js/common.js).
-
-const HEATMAP_FAMILIES = {
-  monthly: { label: "Monthly anomalies (most recent 12 months)" },
-  ndjf_winter: { label: "NDJF winter anomalies (1999–2026)" },
-};
+// same data every other chart on this page uses -- not a static image.
+// "monthly" is a fixed special case (direct per-month sigma, the most
+// recent 12 calendar months available, for comparing products along one
+// shared recent timeline). Every other family is "this window, by year" --
+// the same season/month windows and the same computeWindowValue()
+// aggregation the interactive map's period select and the homepage summary
+// table already use, so a heatmap row and the matching map/table value are
+// always computed the same way.
+const HEATMAP_FAMILIES = { monthly: { label: "Monthly anomalies (most recent 12 months)" } };
+SEASON_ORDER.forEach((key) => {
+  HEATMAP_FAMILIES[`window_${key}`] = { label: `${key} (${SEASON_LABELS[key]}), by year`, window: key };
+});
+MONTH_NAMES.forEach((name, i) => {
+  const key = String(i + 1).padStart(2, "0");
+  HEATMAP_FAMILIES[`window_${key}`] = { label: `${name}, by year`, window: key };
+});
 
 const heatmapState = { family: "monthly", category: "all", region: "ALL", cache: {} };
 
@@ -684,17 +690,17 @@ async function renderHeatmap() {
       });
     };
   } else {
-    const endDate = latestRecordEndMonth();
-    const endYear = parseInt(endDate.slice(0, 4), 10);
+    const windowKey = HEATMAP_FAMILIES[heatmapState.family].window;
+    const { minYear, maxYear } = fullRecordYearRange();
     const years = [];
-    for (let y = 1999; y <= endYear; y++) years.push(y);
+    for (let y = minYear; y <= maxYear; y++) years.push(y);
     xLabels = years.map(String);
     dataForRow = async ({ product, response }) => {
       const data = await fetchHeatmapSeries(`${product}_${response}`);
       const region = data.regions[heatmapState.region];
       if (!region) return years.map(() => null);
       return years.map((year) => {
-        const result = computeWindowValue(data, region, "NDJF", year);
+        const result = computeWindowValue(data, region, windowKey, year);
         return result ? result.sigma : null;
       });
     };
@@ -716,7 +722,13 @@ async function renderHeatmap() {
 
   const trace = {
     x: xLabels, y: yLabels, z, type: "heatmap",
-    colorscale: "RdBu", reversescale: true, zmid: 0,
+    // Plotly's built-in "RdBu" has a pale gray midpoint, not white -- spell
+    // out the stops explicitly so zero (dry/wet-neutral) renders pure white.
+    // Order matches the old "RdBu" + reversescale:true (blue low -> red high).
+    colorscale: [
+      [0, "#2166ac"], [0.25, "#67a9cf"], [0.5, "#ffffff"], [0.75, "#ef8a62"], [1, "#b2182b"],
+    ],
+    zmid: 0,
     colorbar: { title: "σ" },
     hoverongaps: false,
   };

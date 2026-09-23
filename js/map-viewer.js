@@ -497,11 +497,16 @@ async function renderInteractiveMap() {
   const select = document.getElementById("ol-period-select");
   select.innerHTML = "";
   if (!style) {
+    // Without this, the period select/year toggle/boundary checkbox stay
+    // visible with nothing to control -- an empty dropdown next to a map
+    // that isn't there.
+    document.querySelector(".map-controls").style.display = "none";
     document.getElementById("ol-map-wrap").style.display = "none";
     document.getElementById("ol-map-empty").style.display = "block";
     document.getElementById("ol-map-empty").textContent = "No interactive map for this dataset yet.";
     return;
   }
+  document.querySelector(".map-controls").style.display = "";
   const periods = sortedPeriods(Object.keys(style.periods));
   periods.forEach((period) => {
     const option = document.createElement("option");

@@ -9,6 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@400;600;700&family=Merriweather:wght@700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
 </head>
 <body>
 
@@ -133,6 +134,18 @@
     </div>
   </section>
 
+  <section id="observational-coverage">
+    <h2>Data availability</h2>
+    <div class="panel finding-card">
+      <h3>Which observing systems reach the live 2026 growing season, and with what latency?</h3>
+      <p>Actual local temporal coverage for every product in the pipeline,
+        colored by category. Bar length is real record coverage, not an
+        estimate -- computed directly from this dashboard's own manifest.</p>
+      <div id="coverage-chart"></div>
+      <p class="finding-note">Gaps in an individual product's own record are not shown here (see that product's own page for its actual monthly coverage) -- this view is about which products reach which dates at all.</p>
+    </div>
+  </section>
+
   <section id="references">
     <h2>Datasets &amp; references</h2>
     <div style="overflow-x:auto;">
@@ -197,17 +210,6 @@
 </footer>
 
 <script src="js/common.js"></script>
-<script>
-async function init() {
-  await loadManifest();
-  const list = document.getElementById("value-type-list");
-  Object.entries(manifest.value_type_glossary || {}).forEach(([key, text]) => {
-    const li = document.createElement("li");
-    li.innerHTML = `<strong>${key}</strong>: ${text}`;
-    list.appendChild(li);
-  });
-}
-init();
-</script>
+<script src="js/about.js"></script>
 </body>
 </html>
