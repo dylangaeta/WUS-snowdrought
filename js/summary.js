@@ -8,16 +8,13 @@
 // response_drier_is_high() -- the same function the canonical multi-product
 // heatmap uses -- not a locally invented sign convention.
 
-const summaryState = { window: "DJFM", year: 2026, valueType: "sigma", regionGroup: "summary", cache: {} };
+const summaryState = { window: "DJFM", year: 2026, valueType: "sigma", regionGroup: "summary" };
 let summaryRegionColumns = []; // [{code, label}], rebuilt whenever regionGroup changes
 
+// fetchTimeseriesJson (js/common.js) shares one cache with js/heatmaps.js,
+// which loads on this same page -- no separate cache needed here.
 async function fetchSummaryData(product, response) {
-  const key = `${product}_${response}`;
-  if (!summaryState.cache[key]) {
-    const res = await fetch(assetUrl(`data/timeseries/${key}.json`));
-    summaryState.cache[key] = await res.json();
-  }
-  return summaryState.cache[key];
+  return fetchTimeseriesJson(`${product}_${response}`);
 }
 
 function regionColumnsForGroup(group) {
@@ -163,7 +160,7 @@ async function renderSummaryTable() {
     });
     if (cells.every((cell) => cell === null)) return;
     (rowsByCategory[item.category] = rowsByCategory[item.category] || []).push({
-      product: item.product, response: item.response, cells, detrendMethod: item.entry.detrend_method,
+      product: item.product, response: item.response, cells, detrendMethod: item.entry.detrend_method, data,
     });
   });
 
@@ -178,7 +175,7 @@ async function renderSummaryTable() {
     groupRow.innerHTML = `<td colspan="${colCount}">${manifest.category_labels[category]}</td>`;
     body.appendChild(groupRow);
     rows.forEach((row) => {
-      const data = summaryState.cache[`${row.product}_${row.response}`];
+      const data = row.data;
       let note = "";
       if (row.cells.some((cell) => cell && cell.isNativeIndex)) {
         if (SEASON_MONTHS[summaryState.window]) {

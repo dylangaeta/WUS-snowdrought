@@ -22,7 +22,7 @@ MONTH_NAMES.forEach((name, i) => {
   HEATMAP_FAMILIES[`window_${key}`] = { label: `${name}, by year`, window: key };
 });
 
-const heatmapState = { family: "monthly", category: "all", region: "ALL", cache: {} };
+const heatmapState = { family: "monthly", category: "all", region: "ALL" };
 
 function initHeatmaps() {
   const familySelect = document.getElementById("heatmap-family-select");
@@ -78,12 +78,10 @@ function selectHeatmapCategory(category) {
   renderHeatmap();
 }
 
+// fetchTimeseriesJson (js/common.js) shares one cache with js/summary.js,
+// which loads on this same page -- no separate cache needed here.
 async function fetchHeatmapSeries(key) {
-  if (!heatmapState.cache[key]) {
-    const res = await fetch(assetUrl(`data/timeseries/${key}.json`));
-    heatmapState.cache[key] = await res.json();
-  }
-  return heatmapState.cache[key];
+  return fetchTimeseriesJson(key);
 }
 
 function heatmapPairs(category) {
@@ -204,7 +202,12 @@ async function renderHeatmap() {
       [0, "#2166ac"], [0.25, "#67a9cf"], [0.5, "#ffffff"], [0.75, "#ef8a62"], [1, "#b2182b"],
     ],
     zmid: 0,
-    colorbar: { title: "σ<br>(+ = stress)" },
+    // Stress/relief key is the legend above the chart (data.html) -- this
+    // colorbar just shows the numeric sigma scale, not a repeat of the
+    // color convention, since squeezing accurate wording ("stress" one end,
+    // "relief" the other, not "more/less" of the same thing) into a narrow
+    // vertical colorbar title reads worse than a real legend does.
+    colorbar: { title: "σ" },
     hoverongaps: false,
   };
   const layout = {

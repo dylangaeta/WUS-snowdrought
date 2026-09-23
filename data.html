@@ -85,9 +85,17 @@
       one row per product/response, one column per month or year depending
       on the period selected below -- computed live the same way as every
       other chart on this dashboard, not a static image. Colored by stress
-      direction, not raw sign: red always means more stress and blue always
-      means less, so a row is sign-flipped when its own physical variable's
-      stress direction is negative (e.g. low snowpack, not high).</p>
+      direction, not raw sign, using the same
+      <span style="color:#a0290f; font-weight:600;">stress</span> /
+      <span style="color:#205493; font-weight:600;">relief</span> convention
+      as the summary table above: a row is sign-flipped whenever its own
+      physical variable's stress direction is negative (e.g. low snowpack is
+      the stress direction, not high), so red always lands on the stress
+      side and blue always lands on the relief side, never the reverse.</p>
+    <div class="heatmap-legend-key">
+      <span><span class="heatmap-legend-swatch" style="background:#b2182b;"></span> Stress</span>
+      <span><span class="heatmap-legend-swatch" style="background:#2166ac;"></span> Relief</span>
+    </div>
     <div class="explorer-layout">
       <nav class="category-tabs" id="heatmap-category-tabs" aria-label="Category"></nav>
 

@@ -435,6 +435,23 @@ table.headline-table td.window-growing { background: #fbe2ec; color: #7a1240; fo
    figsize=(12.0, 10.2) -- that script never calls set_aspect('equal'), so
    this is the source figure's actual proportions, not a forced square. */
 #quadrant-chart { max-width: 720px; aspect-ratio: 12 / 10.2; margin: 0 auto; }
+
+.heatmap-legend-key {
+  display: flex;
+  gap: 1.5rem;
+  align-items: center;
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: -0.4rem 0 1rem;
+}
+.heatmap-legend-swatch {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  border-radius: 3px;
+  vertical-align: -0.15em;
+  margin-right: 0.3rem;
+}
 .map-empty, .chart-empty { color: var(--text-muted); font-style: italic; padding: 2rem; text-align: center; }
 
 .boundary-toggle { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.9rem; color: var(--text-muted); cursor: pointer; }

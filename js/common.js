@@ -230,6 +230,23 @@ async function loadManifest() {
   return manifest;
 }
 
+// Shared across every consumer of data/timeseries/*.json on a page (data.html
+// loads both js/summary.js and js/heatmaps.js together) so the same
+// product's JSON is never fetched twice just because two different features
+// happen to reference it -- summary.js and heatmaps.js used to keep their
+// own separate caches for the exact same URLs. Caches the in-flight PROMISE,
+// not just the resolved value: both features' initial renders call this for
+// the same key before either fetch has resolved, so caching only the
+// resolved value still let that first race double-fetch (confirmed
+// 2026-09).
+const _timeseriesCache = {};
+function fetchTimeseriesJson(key) {
+  if (!_timeseriesCache[key]) {
+    _timeseriesCache[key] = fetch(assetUrl(`data/timeseries/${key}.json`)).then((res) => res.json());
+  }
+  return _timeseriesCache[key];
+}
+
 // Every top-level region (Western US, CO-UT-WY, and whatever else the
 // pipeline adds -- e.g. NOAA climate regions) comes from manifest.region_labels,
 // never hardcoded here, so a new region shows up everywhere the moment the
