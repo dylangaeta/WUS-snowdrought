@@ -235,6 +235,35 @@ table.headline-table td.window-growing { background: #fbe2ec; color: #7a1240; fo
 .detrend-badge.detrend-mean_centered { background: #eef1f5; color: #3d4451; }
 .detrend-badge.detrend-native_index { background: #e3f3ea; color: #1f6b41; }
 
+/* User-added seasonal-chart years (js/explore.js's explorerState.extraYears)
+   -- each removable via its own x, same idea as a browser tab-group chip. */
+.year-chip-row { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.6rem 0; }
+.year-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.3rem 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #fff;
+}
+.year-chip button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.2em;
+  height: 1.2em;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.25);
+  color: #fff;
+  font-size: 0.8rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.year-chip button:hover { background: rgba(255, 255, 255, 0.4); }
+
 /* --- Explorer page --- */
 .explorer-layout {
   display: grid;

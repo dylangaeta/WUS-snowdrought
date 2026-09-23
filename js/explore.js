@@ -15,8 +15,15 @@ const explorerState = {
   view: "map",
   timeseriesSeries: "value",
   seasonalSeries: "raw",
+  timeseriesStartYear: null, // null = full record
+  extraYears: [], // user-added seasonal-chart years, beyond manifest.seasonal_highlight_years
   seriesCache: {},
 };
+
+// Distinct from manifest.seasonal_highlight_year_colors (an orange/red
+// family) and from the teal climatology-mean line, so user-added years
+// never blend into either.
+const EXTRA_YEAR_COLORS = ["#3182bd", "#756bb1", "#31a354", "#e7298a", "#636363", "#1b9e77"];
 
 function currentResponseEntry() {
   return manifest.categories[explorerState.category][explorerState.product][explorerState.response];
@@ -141,7 +148,76 @@ function onSelectionChanged() {
   const entry = currentResponseEntry();
   document.getElementById("product-meta").innerHTML = productMetaHtml(entry);
   saveLastSelection(explorerState.category, explorerState.product, explorerState.response);
+  // A new product/response has its own record span -- last product's start
+  // year or added years may not even exist in this one, so reset rather
+  // than carry them over silently.
+  explorerState.timeseriesStartYear = null;
+  explorerState.extraYears = [];
+  populateYearControls(entry);
   renderActiveView();
+}
+
+// Populates the Time series "Start year" select and the Seasonal cycle
+// "Add year" select from this response's own record span (manifest
+// record_start/record_end) -- no data fetch needed, those are already in
+// the manifest entry every page already has in hand.
+function populateYearControls(entry) {
+  const startYear = entry.record_start ? parseInt(entry.record_start.slice(0, 4), 10) : null;
+  const endYear = entry.record_end ? parseInt(entry.record_end.slice(0, 4), 10) : null;
+
+  const tsSelect = document.getElementById("timeseries-start-year-select");
+  tsSelect.innerHTML = "";
+  const allOption = document.createElement("option");
+  allOption.value = "";
+  allOption.textContent = "All years";
+  tsSelect.appendChild(allOption);
+  if (startYear !== null && endYear !== null) {
+    for (let y = startYear; y <= endYear; y++) {
+      const option = document.createElement("option");
+      option.value = String(y);
+      option.textContent = String(y);
+      tsSelect.appendChild(option);
+    }
+  }
+  tsSelect.value = "";
+
+  const addSelect = document.getElementById("seasonal-add-year-select");
+  addSelect.innerHTML = "";
+  // A water year runs Oct(Y-1)-Sep(Y), so the earliest addable one needs a
+  // full prior October already in the record -- starts one year after the
+  // record's own first calendar year, not at it.
+  if (startYear !== null && endYear !== null) {
+    for (let y = startYear + 1; y <= endYear; y++) {
+      const option = document.createElement("option");
+      option.value = String(y);
+      option.textContent = String(y);
+      addSelect.appendChild(option);
+    }
+  }
+}
+
+// Water-year-ordered {raw, anomaly} for an arbitrary year, built client-side
+// from the already-complete monthly timeseries data (region.dates/.value/
+// .anomaly cover the full record) -- the same shape manifest.seasonal_
+// highlight_years' precomputed curves already use, so it overlays exactly
+// like one of the default highlight years. null where a whole year's data
+// isn't available (e.g. year not fully in the record) rather than plotting
+// a broken partial curve.
+function computeWaterYearCurve(region, year) {
+  const months = [
+    [10, year - 1], [11, year - 1], [12, year - 1],
+    [1, year], [2, year], [3, year], [4, year], [5, year],
+    [6, year], [7, year], [8, year], [9, year],
+  ];
+  const raw = [];
+  const anomaly = [];
+  for (const [month, y] of months) {
+    const dateStr = `${y}-${String(month).padStart(2, "0")}-01`;
+    const idx = region.dates.indexOf(dateStr);
+    raw.push(idx === -1 ? null : region.value[idx]);
+    anomaly.push(idx === -1 ? null : region.anomaly[idx]);
+  }
+  return raw.every((v) => v === null) ? null : { raw, anomaly };
 }
 
 function wireExplorerControls() {
@@ -182,6 +258,16 @@ function wireExplorerControls() {
     if (!button) return;
     explorerState.seasonalSeries = button.dataset.series;
     document.querySelectorAll("#seasonal-toggle button").forEach((btn) => btn.classList.toggle("active", btn === button));
+    renderSeasonal();
+  });
+  document.getElementById("timeseries-start-year-select").addEventListener("change", (event) => {
+    explorerState.timeseriesStartYear = event.target.value ? parseInt(event.target.value, 10) : null;
+    renderTimeseries();
+  });
+  document.getElementById("seasonal-add-year-btn").addEventListener("click", () => {
+    const year = parseInt(document.getElementById("seasonal-add-year-select").value, 10);
+    if (!year || explorerState.extraYears.includes(year) || manifest.seasonal_highlight_years.includes(year)) return;
+    explorerState.extraYears.push(year);
     renderSeasonal();
   });
 }
@@ -251,15 +337,20 @@ async function renderTimeseries() {
     return;
   }
   const isSigma = explorerState.timeseriesSeries === "sigma";
-  const y = isSigma ? region.sigma : region.value;
+  const fullY = isSigma ? region.sigma : region.value;
   // Native standardized indices (SPI/SPEI/EDDI/PDSI/ForDRI/ESI) are already
   // a standardized departure -- their sigma series is identical to raw, not
   // a re-standardization (see common/canonical.py::_load_drought_index).
   const sigmaLabel = data.native_standardized
     ? `${data.response} (native standardized index)`
     : "Standardized anomaly (σ)";
+  const startYear = explorerState.timeseriesStartYear;
+  const dates = startYear ? region.dates.filter((d) => parseInt(d.slice(0, 4), 10) >= startYear) : region.dates;
+  const y = startYear
+    ? fullY.filter((_, i) => parseInt(region.dates[i].slice(0, 4), 10) >= startYear)
+    : fullY;
   const traces = [{
-    x: region.dates, y, type: "scatter", mode: "lines",
+    x: dates, y, type: "scatter", mode: "lines",
     line: { color: "#1b1b1b", width: 1.4 },
     name: isSigma ? sigmaLabel : `${data.response} (${data.units})`,
     hovertemplate: "%{x|%Y-%m}: %{y:.2f}<extra></extra>",
@@ -309,6 +400,23 @@ async function renderSeasonal() {
       name: curve.label,
     });
   });
+  if (explorerState.extraYears.length > 0) {
+    // The precomputed highlight_years curves only cover manifest.seasonal_
+    // highlight_years -- any other year is built client-side from the
+    // already-complete monthly timeseries data instead of needing a new
+    // pipeline export.
+    const tsData = await fetchSeries("timeseries");
+    const tsRegion = tsData.regions[explorerState.region];
+    explorerState.extraYears.forEach((year, i) => {
+      const curve = tsRegion && computeWaterYearCurve(tsRegion, year);
+      if (!curve) return;
+      traces.push({
+        x, y: isAnomaly ? curve.anomaly : curve.raw, type: "scatter", mode: "lines",
+        line: { color: EXTRA_YEAR_COLORS[i % EXTRA_YEAR_COLORS.length], width: 2, dash: "dot" },
+        name: `Water year ${year}`,
+      });
+    });
+  }
   const layout = {
     margin: { t: 20, r: 20, b: 45, l: 60 },
     yaxis: { title: isAnomaly ? `${data.response} anomaly (${data.units})` : `${data.response} (${data.units})`, zeroline: isAnomaly },
@@ -316,6 +424,23 @@ async function renderSeasonal() {
     font: { family: "Source Sans Pro, sans-serif", size: 13 },
   };
   Plotly.newPlot(chart, traces, layout, { responsive: true, displaylogo: false });
+  renderExtraYearChips();
+}
+
+function renderExtraYearChips() {
+  const row = document.getElementById("seasonal-extra-years");
+  row.innerHTML = "";
+  explorerState.extraYears.forEach((year, i) => {
+    const chip = document.createElement("span");
+    chip.className = "year-chip";
+    chip.style.background = EXTRA_YEAR_COLORS[i % EXTRA_YEAR_COLORS.length];
+    chip.innerHTML = `Water year ${year} <button type="button" aria-label="Remove ${year}">&times;</button>`;
+    chip.querySelector("button").addEventListener("click", () => {
+      explorerState.extraYears = explorerState.extraYears.filter((y) => y !== year);
+      renderSeasonal();
+    });
+    row.appendChild(chip);
+  });
 }
 
 // ------------------------------------------------------------------ Compare
@@ -683,15 +808,28 @@ async function renderHeatmap() {
       const data = await fetchHeatmapSeries(`${product}_${response}`);
       const region = data.regions[heatmapState.region];
       if (!region) return months.map(() => null);
+      // Flip sign so red always means "more stress" and blue always means
+      // "less stress" on every row, regardless of each variable's own raw
+      // sign convention (a positive temperature anomaly IS the stress
+      // direction, but a positive snowpack anomaly is relief, the opposite)
+      // -- same drier_is_high-driven flip the Compare view's "By category"
+      // mode already applies for the same reason (see about.html).
+      const sign = data.drier_is_high ? 1 : -1;
       return months.map(({ year, month }) => {
         const dateStr = `${year}-${String(month).padStart(2, "0")}-01`;
         const idx = region.dates.indexOf(dateStr);
-        return idx === -1 ? null : region.sigma[idx];
+        return idx === -1 ? null : sign * region.sigma[idx];
       });
     };
   } else {
     const windowKey = HEATMAP_FAMILIES[heatmapState.family].window;
-    const { minYear, maxYear } = fullRecordYearRange();
+    // fullRecordYearRange() spans every product's true record_start (1895
+    // for SPI/SPEI/PRISM-based products), which would compress this whole
+    // dashboard's real 1990-2026 baseline era into a sliver -- floor at
+    // 1990 to match the About page's own coverage-chart floor.
+    const fullRange = fullRecordYearRange();
+    const minYear = Math.max(1990, fullRange.minYear);
+    const maxYear = fullRange.maxYear;
     const years = [];
     for (let y = minYear; y <= maxYear; y++) years.push(y);
     xLabels = years.map(String);
@@ -699,16 +837,23 @@ async function renderHeatmap() {
       const data = await fetchHeatmapSeries(`${product}_${response}`);
       const region = data.regions[heatmapState.region];
       if (!region) return years.map(() => null);
+      // Same stress-direction sign flip as the "monthly" branch above.
+      const sign = data.drier_is_high ? 1 : -1;
       return years.map((year) => {
         const result = computeWindowValue(data, region, windowKey, year);
-        return result ? result.sigma : null;
+        return result ? sign * result.sigma : null;
       });
     };
   }
 
   const yLabels = [];
   z = [];
-  for (const pair of pairs) {
+  // Plotly's categorical y-axis renders array index 0 at the BOTTOM, so
+  // pushing category_order's own top-to-bottom sequence (snow/climate first,
+  // drought last) unreversed put drought at the top and snow at the bottom
+  // -- backwards. Reverse once here, same fix already used by the About
+  // page's coverage chart for the same reason.
+  for (const pair of [...pairs].reverse()) {
     const row = await dataForRow(pair);
     if (row.every((v) => v === null)) continue;
     const detrendMethod = findResponseEntry(pair.product, pair.response)?.detrend_method;
@@ -729,7 +874,7 @@ async function renderHeatmap() {
       [0, "#2166ac"], [0.25, "#67a9cf"], [0.5, "#ffffff"], [0.75, "#ef8a62"], [1, "#b2182b"],
     ],
     zmid: 0,
-    colorbar: { title: "σ" },
+    colorbar: { title: "σ<br>(+ = stress)" },
     hoverongaps: false,
   };
   const layout = {

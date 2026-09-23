@@ -116,18 +116,30 @@
         </div>
 
         <div class="view-panel" id="panel-timeseries">
-          <div class="series-toggle" id="timeseries-toggle">
-            <button data-series="value" class="active">Raw</button>
-            <button data-series="sigma">Anomaly (&sigma;)</button>
+          <div class="selector-row">
+            <div class="series-toggle" id="timeseries-toggle">
+              <button data-series="value" class="active">Raw</button>
+              <button data-series="sigma">Anomaly (&sigma;)</button>
+            </div>
+            <label class="boundary-toggle" for="timeseries-start-year-select">Start year
+              <select id="timeseries-start-year-select" aria-label="Start year"></select>
+            </label>
           </div>
           <div id="timeseries-chart" style="height:480px;"></div>
         </div>
 
         <div class="view-panel" id="panel-seasonal">
-          <div class="series-toggle" id="seasonal-toggle">
-            <button data-series="raw" class="active">Raw</button>
-            <button data-series="anomaly">Anomaly</button>
+          <div class="selector-row">
+            <div class="series-toggle" id="seasonal-toggle">
+              <button data-series="raw" class="active">Raw</button>
+              <button data-series="anomaly">Anomaly</button>
+            </div>
+            <label class="boundary-toggle" for="seasonal-add-year-select">Add year
+              <select id="seasonal-add-year-select" aria-label="Add a year to the seasonal chart"></select>
+            </label>
+            <button type="button" id="seasonal-add-year-btn">Add</button>
           </div>
+          <div id="seasonal-extra-years" class="year-chip-row"></div>
           <div id="seasonal-chart" style="height:480px;"></div>
         </div>
       </div>
@@ -161,9 +173,15 @@
   </section>
 
   <section id="heatmaps">
-    <h2>Heatmaps</h2>
-    <p>Standardized anomaly (&sigma;) by product and month, computed the same
-      way as every other chart on this page -- not a static image.</p>
+    <h2>Anomaly heatmaps by product and time</h2>
+    <p>Every product's standardized anomaly (&sigma;) from its own baseline,
+      one row per product/response, one column per month or year depending
+      on the period selected below -- computed live the same way as every
+      other chart on this page, not a static image. Colored by stress
+      direction, not raw sign: red always means more stress and blue always
+      means less, so a row is sign-flipped when its own physical variable's
+      stress direction is negative (e.g. low snowpack, not high) -- the same
+      convention the "By category" Compare view uses.</p>
     <div class="explorer-layout">
       <nav class="category-tabs" id="heatmap-category-tabs" aria-label="Category"></nav>
 
