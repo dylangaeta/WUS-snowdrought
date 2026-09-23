@@ -426,6 +426,13 @@ async function updateInteractiveMapLayer() {
   const source = new ol.source.GeoTIFF({
     sources: [{ url, nodata: -32768 }],
     normalize: false,
+    // The layer's own interpolate:false (below) only controls the final
+    // display-zoom texture sampling -- this source does its own separate
+    // resampling first, reprojecting the COG's native lat/lon grid into Web
+    // Mercator, and defaults to smoothing there too regardless of the
+    // layer setting (confirmed: still smooth blob-like gradients instead
+    // of sharp per-cell blocks with only the layer flag set).
+    interpolate: false,
   });
 
   const legend = document.getElementById("ol-legend");
@@ -468,6 +475,13 @@ async function updateInteractiveMapLayer() {
   olMapState.rasterLayer = new ol.layer.WebGLTile({
     source,
     style: colorExpr ? { color: colorExpr } : undefined,
+    // Default WebGL texture sampling is bilinear -- it blends each screen
+    // pixel from its 4 nearest grid cells, smearing the real cell-by-cell
+    // structure into smooth gradients (confirmed: the pipeline's own
+    // matplotlib maps show crisp, blocky per-cell values with no such
+    // blending). Nearest-neighbor sampling makes one grid cell = one flat
+    // color block, matching the reference maps exactly.
+    interpolate: false,
   });
   olMapState.map.getLayers().insertAt(1, olMapState.rasterLayer); // above basemap, below boundaries
 }

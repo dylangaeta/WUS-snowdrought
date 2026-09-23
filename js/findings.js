@@ -204,10 +204,22 @@ function renderCoverageChart() {
     };
   });
 
+  // A couple of products (SPI/SPEI, nClimGrid-based) have a genuinely real
+  // record back to 1895 -- accurate, not a bug -- but auto-scaling the
+  // shared axis to fit them compresses every other product's actual
+  // 1979-2026 satellite/reanalysis-era coverage into a sliver. Floor the
+  // visible window at 1979 (the modern satellite-reanalysis era this whole
+  // dashboard is scoped to); the true earlier start is still correct in
+  // each bar's own data and in its hover text, just off the left edge of
+  // the default view rather than distorting the axis. Plotly silently
+  // ignores a range array with a null endpoint, so the upper bound has to
+  // be a real value too -- computed from the data's own latest end date,
+  // not a hardcoded year.
+  const latestEnd = rows.reduce((max, r) => (r.end > max ? r.end : max), rows[0].end);
   const layout = {
     margin: { t: 20, r: 20, b: 45, l: 180 },
     barmode: "stack",
-    xaxis: { type: "date", title: "Record coverage" },
+    xaxis: { type: "date", title: "Record coverage", range: ["1979-01-01", latestEnd] },
     yaxis: { automargin: true },
     font: { family: "Source Sans Pro, sans-serif", size: 12 },
     height: Math.max(400, rows.length * 16 + 100),
