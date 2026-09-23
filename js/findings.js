@@ -14,12 +14,15 @@
 // classify() exactly (do not diverge). The regime itself always comes from
 // the pipeline's own precomputed classification (data/
 // snow_drought_classification.json's "regime" field), never recomputed here.
+// Labels are dataset-qualified, matching 11_context_SnowDroughtQuadrants_
+// analyze.py's own VARIABLES dict verbatim (its "label" field, minus the
+// "DJFM Anomaly (unit)" suffix -- unit/window are shown separately here).
 const QUADRANT_VARIABLES = {
-  t_anom: { label: "Temperature", unit: "°C", stress_high: true, stress: "warm", benign: "cold" },
-  ppt_anom: { label: "Precipitation", unit: "mm", stress_high: false, stress: "dry", benign: "wet" },
-  swe_anom: { label: "Snowpack (SNOTEL)", unit: "mm", stress_high: false, stress: "low snow", benign: "high snow" },
-  vpd_anom: { label: "Max VPD", unit: "hPa", stress_high: true, stress: "high VPD", benign: "low VPD" },
-  sca_anom: { label: "Snow cover (MODIS)", unit: "%", stress_high: false, stress: "low snow cover", benign: "high snow cover" },
+  t_anom: { label: "ERA5-Land Temperature", unit: "°C", stress_high: true, stress: "warm", benign: "cold" },
+  ppt_anom: { label: "PRISM Precipitation", unit: "mm", stress_high: false, stress: "dry", benign: "wet" },
+  swe_anom: { label: "SNOTEL Snowpack", unit: "mm", stress_high: false, stress: "low snow", benign: "high snow" },
+  vpd_anom: { label: "PRISM Max VPD", unit: "hPa", stress_high: true, stress: "high VPD", benign: "low VPD" },
+  sca_anom: { label: "MODIS Snow Cover", unit: "%", stress_high: false, stress: "low snow cover", benign: "high snow cover" },
 };
 const REGIME_COLORS = { dry: "#dfc27d", warm_dry: "#d6604d", warm: "#f4a582", none: "#92c5de" };
 const REGIME_LABELS = {
