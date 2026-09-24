@@ -138,7 +138,11 @@ async function renderHeatmap() {
       if (m <= 0) { m += 12; y -= 1; }
       months.push({ year: y, month: m });
     }
-    xLabels = months.map(({ year, month }) => `${MONTH_NAMES[month - 1].slice(0, 3)} ${year}`);
+    // Two-row tick label (month above, year below) instead of one rotated
+    // "Jan 2026" string -- easier to read at the narrow per-column width a
+    // 12-column heatmap has, and each column here really is its own
+    // distinct real month/year (unlike the seasonal chart's shared axis).
+    xLabels = months.map(({ year, month }) => `${MONTH_NAMES[month - 1].slice(0, 3)}<br>${year}`);
     computeRow = (data) => {
       const region = data.regions[heatmapState.region];
       if (!region) return months.map(() => null);
@@ -212,7 +216,7 @@ async function renderHeatmap() {
   };
   const layout = {
     margin: { t: 20, r: 20, b: 60, l: 180 },
-    xaxis: { side: "bottom" },
+    xaxis: { side: "bottom", tickangle: 0 },
     yaxis: { automargin: true },
     font: { family: "Source Sans Pro, sans-serif", size: 12 },
     height: Math.max(360, yLabels.length * 22 + 100),
