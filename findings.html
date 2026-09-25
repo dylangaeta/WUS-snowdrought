@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="description" content="Key findings from the Western US snow drought explorer: observational coverage, cross-product anomaly patterns, and Dierauer snow-drought classification for the 2025-2026 winter.">
-<title>Key Findings &mdash; 2025-2026 Western US Climate and Snow Drought Explorer</title>
+<meta name="description" content="Overview of the Western US snow drought explorer's data views -- maps, time series, seasonal cycle, cross-product anomalies, heatmaps, data availability -- and the Dierauer snow-drought classification for the 2025-2026 winter.">
+<title>Overview &mdash; 2025-2026 Western US Climate and Snow Drought Explorer</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg stroke='%23162e51' stroke-width='2' stroke-linecap='round'%3E%3Cline x1='12' y1='2' x2='12' y2='22'/%3E%3Cline x1='4' y1='6' x2='20' y2='18'/%3E%3Cline x1='4' y1='18' x2='20' y2='6'/%3E%3C/g%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@400;600;700&family=Merriweather:wght@700;900&display=swap" rel="stylesheet">
@@ -21,7 +21,7 @@
     </a></h1>
     <nav class="site-nav">
       <a href="index.html">Home</a>
-      <a href="findings.html" class="active">Key Findings</a>
+      <a href="findings.html" class="active">Overview</a>
       <a href="explore.html">Time Series</a>
       <a href="data.html">Summary & Heatmaps</a>
       <a href="about.html">About</a>
@@ -31,41 +31,28 @@
 
 <main>
 
-  <section id="key-findings">
-    <h2>Key findings</h2>
-    <p>
-      Every chart on this dashboard, this page included, answers a specific
-      question about how 2025-2026 conditions departed from the fixed
-      calendar-month climatology (see <a href="about.html">About</a> for the
-      full methodology) &mdash; computed live from the same JSON every other
-      page uses, not a static image. Every value here is descriptive: a
-      single year (or month) compared against its own baseline, never
-      against another year.
-    </p>
-    <p>
-      How anomalous was 2025-2026 across the snow, water, and vegetation
-      observing systems, product by product? That's
-      <a href="explore.html#compare">Compare variables</a> &mdash; every
-      product in a theme overlaid on one standardized-anomaly axis,
-      observations solid / models dashed. How did physical anomalies emerge
-      through the year, across every product at once? That's the
-      <a href="data.html#heatmaps">Heatmaps</a> section on the Summary &amp;
-      Heatmaps page.
-    </p>
+  <section id="overview">
+    <h2>Overview</h2>
+    <ul class="overview-list">
+      <li><strong>Maps</strong> &mdash; <a href="index.html">Home</a>: Cloud Optimized GeoTIFF maps, by month/season/year, per product.</li>
+      <li><strong>Time series &amp; seasonal cycle</strong> &mdash; <a href="explore.html">Time Series</a>: monthly values and anomalies, per product.</li>
+      <li><strong>Cross-product anomalies</strong> &mdash; <a href="explore.html#compare">Compare variables</a>: standardized-anomaly overlay by theme.</li>
+      <li><strong>Regional summary table</strong> &mdash; <a href="data.html">Summary &amp; Heatmaps</a>: all products/regions, one month/season/year.</li>
+      <li><strong>Heatmaps</strong> &mdash; <a href="data.html#heatmaps">Summary &amp; Heatmaps</a>: standardized anomaly, all products, full record.</li>
+      <li><strong>Data availability</strong> &mdash; <a href="about.html#observational-coverage">About</a>: record length and latency, per product.</li>
+    </ul>
+    <p class="finding-note">Baseline: each product's own fixed calendar-month climatology. Not year-over-year. Not a forecast. Methodology: <a href="about.html">About</a>.</p>
   </section>
 
   <section id="snow-drought-classification">
     <div class="panel finding-card">
-      <h3>How did each DJFM winter classify by snow-drought type?</h3>
-      <p>
+      <h3>Snow drought classification by winter type</h3>
+      <p class="finding-note">
         Dierauer, Allen &amp; Whitfield (2019, <em>Water Resources
-        Research</em>) split below-normal snowpack winters by their
-        precipitation and temperature departure into dry, warm-and-dry, and
-        warm snow droughts. Each point is one DJFM winter (1991&ndash;2026),
-        placed by its own anomaly relative to the fixed baseline &mdash; pick
-        any two drivers to see how they relate; the color always reflects the
-        Dierauer classification itself (temperature &times; precipitation
-        &times; snowpack), not the two axes shown.
+        Research</em>) classification: dry / warm-and-dry / warm snow
+        drought, by precipitation and temperature departure. One point per
+        DJFM winter (1991&ndash;2026). Color = classification (temperature
+        &times; precipitation &times; snowpack), independent of axes shown.
       </p>
       <div class="selector-row">
         <select id="quadrant-region-select" aria-label="Region"></select>

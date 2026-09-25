@@ -1,4 +1,4 @@
-// Key Findings page. No static images anywhere -- every figure here is
+// Overview page. No static images anywhere -- every figure here is
 // computed live from the same JSON every other page uses. The pipeline's
 // cross-product combined-overlay and monthly-anomaly-heatmap questions
 // (formerly static PNGs) are answered by the *same* dynamic components

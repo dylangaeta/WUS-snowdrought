@@ -21,7 +21,7 @@
     </a></h1>
     <nav class="site-nav">
       <a href="index.html">Home</a>
-      <a href="findings.html">Key Findings</a>
+      <a href="findings.html">Overview</a>
       <a href="explore.html" class="active">Time Series</a>
       <a href="data.html">Summary & Heatmaps</a>
       <a href="about.html">About</a>
@@ -33,13 +33,11 @@
 
   <section id="explorer">
     <h2>Time Series</h2>
-    <p>Every canonical dataset in the pipeline: pick a category, product, and
-      variable, then switch between time series and seasonal-cycle views.
-      Anomalies are always relative to each product's own fixed
-      calendar-month climatology &mdash; never a year-against-year
-      comparison. For the interactive map, see the
-      <a href="index.html">Home</a> page; for the regional summary table and
-      cross-product heatmaps, see <a href="data.html">Summary & Heatmaps</a>.</p>
+    <p class="finding-note">Every canonical dataset: category, product,
+      variable, then time series or seasonal cycle. Anomalies are relative
+      to each product's own fixed calendar-month climatology, never
+      year-over-year. Maps: <a href="index.html">Home</a>. Summary table
+      &amp; heatmaps: <a href="data.html">Summary &amp; Heatmaps</a>.</p>
 
     <div class="product-search-wrap">
       <input type="search" id="product-search" placeholder="Search products (e.g. &quot;snow water equivalent&quot;, &quot;PRISM&quot;)..." aria-label="Search products">
@@ -95,10 +93,9 @@
 
   <section id="compare">
     <h2>Compare variables</h2>
-    <p>Overlay standardized anomalies (&sigma;) on one chart to see how
-      variables move together over time. All series share one axis because
-      &sigma; removes each variable's own physical units, leaving only how
-      far each one departs from its own baseline.</p>
+    <p class="finding-note">Standardized anomalies (&sigma;) overlaid on one
+      chart, one shared axis &mdash; &sigma; removes each variable's
+      physical units, leaving only its departure from baseline.</p>
     <div class="selector-row">
       <select id="compare-category-select" aria-label="Category"></select>
       <select id="compare-region-select" aria-label="Region"></select>
