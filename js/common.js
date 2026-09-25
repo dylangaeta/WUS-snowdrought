@@ -5,7 +5,12 @@
 // Hard floor across every page (Dylan, 2026-09): a handful of products
 // (SPI/SPEI/PRISM-based) have a real record back to 1895, which compresses
 // this whole dashboard's actual 1990-2026 baseline era into a sliver
-// whenever a chart shares one axis/dropdown across many products.
+// whenever a chart shares one axis/dropdown across many products. Same name
+// as config.py's own DASHBOARD_MIN_YEAR, but deliberately a different value
+// (1979 there) -- that one floors what 14_dashboard_export.py writes into
+// the JSON in the first place; this one floors the narrower display window
+// applied on top of that already-exported data. Not a bug if they diverge;
+// would be a bug if this one ever floored BELOW 1979 (data that doesn't exist).
 const DASHBOARD_MIN_YEAR = 1990;
 
 const MONTH_NAMES = [
@@ -31,7 +36,12 @@ const SEASON_MONTHS = {
   MAMJJAS: [3, 4, 5, 6, 7, 8, 9], ANNUAL: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
 };
 
-// Mirrors config.py's PRODUCT_OBSERVATION_KIND exactly -- do not diverge.
+// Mirrors config.py's PRODUCT_OBSERVATION_KIND -- do not diverge, with one
+// known exception: "VIIRS-NDVI" (audited 2026-09, live in manifest.json) is
+// missing from config.py's own dict there too, a pipeline-side gap flagged
+// to Dylan separately. Added here so the Compare view doesn't render it
+// dashed/"model" in the meantime -- satellite NDVI, same observation basis
+// as MODIS-Terra/Aqua NDVI/EVI directly above.
 // Drives solid (observation) vs dashed (model) line styling in the
 // category-grouped overlay view, same convention as
 // 11_combined_GroupOverlays_analyze.py's line_style().
@@ -45,7 +55,7 @@ const PRODUCT_OBSERVATION_KIND = {
   "PhenoCam": "observation", "SMOS": "observation", "CAMS": "model",
   "CarbonTracker": "model", "FluxSat": "model", "GOSIF": "model",
   "GOSIF-GPP": "model", "MiCASA": "model", "MODIS-Terra": "observation",
-  "MODIS-Aqua": "observation", "TROPOSIF": "observation", "SPI": "observation",
+  "MODIS-Aqua": "observation", "VIIRS-NDVI": "observation", "TROPOSIF": "observation", "SPI": "observation",
   "SPEI": "observation", "EDDI": "model", "PDSI": "model", "ForDRI": "model",
   "ESI": "observation", "VHP": "observation", "VegDRI": "observation",
   "USDM": "observation", "VIIRS": "observation", "GRACE-L4": "model",
@@ -230,15 +240,15 @@ async function loadManifest() {
   return manifest;
 }
 
-// Shared across every consumer of data/timeseries/*.json on a page (data.html
-// loads both js/summary.js and js/heatmaps.js together) so the same
-// product's JSON is never fetched twice just because two different features
-// happen to reference it -- summary.js and heatmaps.js used to keep their
-// own separate caches for the exact same URLs. Caches the in-flight PROMISE,
-// not just the resolved value: both features' initial renders call this for
+// Shared across every consumer of data/timeseries/*.json on a page --
+// data.html loads js/summary.js and js/heatmaps.js together, and
+// explore.html's own single-product Explorer view and Compare view fetch the
+// same product's file whenever the product checked in Compare is also the
+// one selected in the Explorer picker. Each of those used to keep its own
+// separate cache for the exact same URLs. Caches the in-flight PROMISE, not
+// just the resolved value: two features' initial renders can call this for
 // the same key before either fetch has resolved, so caching only the
-// resolved value still let that first race double-fetch (confirmed
-// 2026-09).
+// resolved value still let that first race double-fetch (confirmed 2026-09).
 const _timeseriesCache = {};
 function fetchTimeseriesJson(key) {
   if (!_timeseriesCache[key]) {
@@ -247,17 +257,49 @@ function fetchTimeseriesJson(key) {
   return _timeseriesCache[key];
 }
 
+// Same sharing rationale as fetchTimeseriesJson above, for data/seasonal/*.json
+// (explore.html's Explorer "Seasonal cycle" tab and Compare's vegetation-only
+// growing-season mask both read it). Resolves to null on a non-ok response
+// rather than rejecting -- mirrors the tolerance the old per-page
+// fetchCompareSeasonal() already had, so callers can just check for a falsy
+// result instead of a try/catch.
+const _seasonalCache = {};
+function fetchSeasonalJson(key) {
+  if (!_seasonalCache[key]) {
+    _seasonalCache[key] = fetch(assetUrl(`data/seasonal/${key}.json`)).then((res) => (res.ok ? res.json() : null));
+  }
+  return _seasonalCache[key];
+}
+
 // Every top-level region (Western US, CO-UT-WY, and whatever else the
 // pipeline adds -- e.g. NOAA climate regions) comes from manifest.region_labels,
 // never hardcoded here, so a new region shows up everywhere the moment the
-// pipeline export includes it -- no dashboard code change needed.
+// pipeline export includes it -- no dashboard code change needed. Kept
+// separate from allRegionEntries() below: js/summary.js's "Regions" tab uses
+// this narrower list on purpose, as one of three distinct tabs (Regions/
+// States/HUC2) -- widening it here would duplicate every state and HUC2
+// basin into that tab too.
 function regionEntries() {
   return Object.entries(manifest.region_labels).map(([code, label]) => ({ code, label }));
 }
 
+// Every region code the pipeline actually exports data for: the 6 named
+// regions plus all 11 states and 5 HUC2 basins, which every per-product
+// timeseries JSON already carries. Used by the single flat region
+// pickers (Explorer, Compare, Heatmaps) so they expose the same data
+// js/summary.js's grouped Regions/States/HUC2 tabs already do -- confirmed
+// 2026-09-25 those pickers were silently capped at the 6 named regions via
+// regionEntries(), hiding 16 of 22 regions' worth of processed data.
+function allRegionEntries() {
+  const named = regionEntries();
+  const states = manifest.western_states.map((code) => ({ code, label: manifest.state_labels[code] }));
+  const huc2 = manifest.huc2_regions.map((code) => ({ code, label: manifest.huc2_labels[code] }));
+  return [...named, ...states, ...huc2];
+}
+
 function populateRegionSelect(select, defaultCode = "ALL") {
   select.innerHTML = "";
-  regionEntries().forEach(({ code, label }) => {
+  allRegionEntries().forEach(({ code, label }) => {
     const option = document.createElement("option");
     option.value = code;
     option.textContent = label;
@@ -268,7 +310,7 @@ function populateRegionSelect(select, defaultCode = "ALL") {
 
 function populateRegionToggle(container, defaultCode = "ALL") {
   container.innerHTML = "";
-  regionEntries().forEach(({ code, label }) => {
+  allRegionEntries().forEach(({ code, label }) => {
     const button = document.createElement("button");
     button.dataset.region = code;
     button.textContent = label;

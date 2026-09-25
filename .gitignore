@@ -9,3 +9,7 @@
 /figures/maps/
 
 .DS_Store
+
+# Live Cloudflare API token + R2 access/secret keys for sync_cogs_to_r2.sh --
+# never commit this.
+cloudflare_token.txt
