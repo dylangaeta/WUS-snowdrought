@@ -84,13 +84,23 @@ async function fetchHeatmapSeries(key) {
   return fetchTimeseriesJson(key);
 }
 
-function heatmapPairs(category) {
+function heatmapPairs(category, family) {
   const pairs = [];
   const cats = category === "all" ? manifest.category_order : [category];
   cats.forEach((cat) => {
     const products = manifest.categories[cat] || {};
     for (const [product, responses] of Object.entries(products)) {
-      for (const response of Object.keys(responses)) pairs.push({ product, response });
+      for (const [response, entry] of Object.entries(responses)) {
+        // "monthly" reads each stored per-month sigma directly -- no
+        // aggregation involved, so it's fine even for products (e.g. NEON
+        // NEE) with no established multi-month aggregation rule. Every other
+        // family aggregates across a season/month window via
+        // computeWindowValue(), same as js/summary.js -- exclude those
+        // products here too, for the same reason summary.js does (see its
+        // own "no established aggregation rule" comment).
+        if (family !== "monthly" && !entry.aggregation) continue;
+        pairs.push({ product, response });
+      }
     }
   });
   return pairs;
@@ -112,7 +122,7 @@ function latestRecordEndMonth() {
 
 async function renderHeatmap() {
   const chart = document.getElementById("heatmap-chart");
-  const pairs = heatmapPairs(heatmapState.category);
+  const pairs = heatmapPairs(heatmapState.category, heatmapState.family);
   if (pairs.length === 0) {
     chart.innerHTML = '<p class="chart-empty">No products in this category.</p>';
     return;

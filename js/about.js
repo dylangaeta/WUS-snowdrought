@@ -61,7 +61,7 @@ function renderCoverageChart() {
   const layout = {
     margin: { t: 20, r: 20, b: 45, l: 180 },
     barmode: "stack",
-    xaxis: { type: "date", title: "Record coverage", range: ["1990-01-01", latestEnd] },
+    xaxis: { type: "date", title: "Record coverage", range: [`${DASHBOARD_MIN_YEAR}-01-01`, latestEnd] },
     yaxis: { automargin: true },
     font: { family: "Source Sans Pro, sans-serif", size: 12 },
     height: Math.max(400, rows.length * 16 + 100),

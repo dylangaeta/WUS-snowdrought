@@ -17,7 +17,6 @@ const explorerState = {
   seasonalSeries: "raw",
   timeseriesStartYear: null, // null = full record
   extraYears: [], // user-added seasonal-chart years, beyond manifest.seasonal_highlight_years
-  seriesCache: {},
 };
 
 // Distinct from manifest.seasonal_highlight_year_colors (an orange/red
@@ -304,13 +303,13 @@ function renderActiveView() {
   else renderSeasonal();
 }
 
-async function fetchSeries(kind) {
-  const key = `${kind}:${explorerState.product}_${explorerState.response}`;
-  if (!explorerState.seriesCache[key]) {
-    const response = await fetch(assetUrl(`data/${kind}/${explorerState.product}_${explorerState.response}.json`));
-    explorerState.seriesCache[key] = await response.json();
-  }
-  return explorerState.seriesCache[key];
+// Delegates to js/common.js's shared per-page caches (fetchTimeseriesJson /
+// fetchSeasonalJson) instead of keeping its own -- the same product/response
+// JSON is also fetched by the Compare view below whenever that product
+// happens to be checked there too.
+function fetchSeries(kind) {
+  const key = `${explorerState.product}_${explorerState.response}`;
+  return kind === "timeseries" ? fetchTimeseriesJson(key) : fetchSeasonalJson(key);
 }
 
 async function renderTimeseries() {
@@ -465,8 +464,6 @@ const compareState = {
   // rebuilt the legend from the hardcoded default, silently discarding
   // whatever the user had checked/unchecked (Dylan, 2026-09).
   checkedByCategory: {},
-  cache: {},
-  seasonalCache: {},
 };
 const CATEGORY_OVERLAY_COLORS = [
   "#205493", "#a0290f", "#2e8540", "#946e00", "#5c3d99",
@@ -499,22 +496,6 @@ function initCompareView() {
   });
 
   renderCategoryOverlay();
-}
-
-async function fetchCompareSeries(key) {
-  if (!compareState.cache[key]) {
-    const res = await fetch(assetUrl(`data/timeseries/${key}.json`));
-    compareState.cache[key] = await res.json();
-  }
-  return compareState.cache[key];
-}
-
-async function fetchCompareSeasonal(key) {
-  if (!(key in compareState.seasonalCache)) {
-    const res = await fetch(assetUrl(`data/seasonal/${key}.json`));
-    compareState.seasonalCache[key] = res.ok ? await res.json() : null;
-  }
-  return compareState.seasonalCache[key];
 }
 
 function plotlyLayout() {
@@ -575,13 +556,15 @@ async function renderCategoryOverlay() {
   // each one's seasonal JSON too, for the vegetation category's growing-
   // season mask) -- some categories have 15-27 products, and awaiting each
   // fetch in turn meant a full re-render waited on that many sequential
-  // network round-trips (fetchCompareSeries/fetchCompareSeasonal's own
-  // caches still apply per key either way).
+  // network round-trips (fetchTimeseriesJson/fetchSeasonalJson's shared
+  // per-page caches, js/common.js, still apply per key either way -- also
+  // shared with the single-product Explorer view above, so switching between
+  // Explorer and Compare on the same product never re-fetches it).
   const seriesList = await Promise.all(
-    pairs.map(({ product, response }) => fetchCompareSeries(`${product}_${response}`))
+    pairs.map(({ product, response }) => fetchTimeseriesJson(`${product}_${response}`))
   );
   const seasonalList = category === "vegetation"
-    ? await Promise.all(pairs.map(({ product, response }) => fetchCompareSeasonal(`${product}_${response}`)))
+    ? await Promise.all(pairs.map(({ product, response }) => fetchSeasonalJson(`${product}_${response}`)))
     : null;
 
   const traces = [];
