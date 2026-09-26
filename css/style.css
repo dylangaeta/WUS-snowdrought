@@ -169,8 +169,8 @@ table.headline-table tbody tr:not(.group-row) { transition: background var(--tra
    (not raw arithmetic sign -- e.g. EDDI/VPD/temperature are "stress" when
    POSITIVE, snow/soil-moisture/precip are "stress" when NEGATIVE). Relief =
    the opposite direction for that same variable. */
-table.headline-table td.stress { color: #a0290f; font-weight: 600; }
-table.headline-table td.relief { color: #205493; font-weight: 600; }
+table.headline-table td.stress { color: #955910; font-weight: 600; }
+table.headline-table td.relief { color: #0e726a; font-weight: 600; }
 table.headline-table tr.group-row td {
   background: #f5f6f7;
   color: var(--navy);
@@ -452,7 +452,16 @@ table.headline-table td.window-growing { background: #fbe2ec; color: #7a1240; fo
   vertical-align: -0.15em;
   margin-right: 0.3rem;
 }
-.map-empty, .chart-empty { color: var(--text-muted); font-style: italic; padding: 2rem; text-align: center; }
+.map-empty, .chart-empty, .no-data-cell {
+  color: #b2182b;
+  font-weight: 600;
+  text-align: center;
+  background: #fdecea;
+  border: 2px solid #b2182b;
+  border-radius: 6px;
+}
+.map-empty, .chart-empty { padding: 1.25rem 1.5rem; margin: 1rem 0; }
+.no-data-cell { padding: 0.4rem 0.6rem; }
 
 .boundary-toggle { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.9rem; color: var(--text-muted); cursor: pointer; }
 .year-slider-wrap { display: inline-flex; align-items: center; gap: 0.6rem; max-width: 100%; }
@@ -590,7 +599,7 @@ table.headline-table td.window-growing { background: #fbe2ec; color: #7a1240; fo
 .series-toggle button:last-child { border-right: none; }
 .series-toggle button:hover:not(.active):not(:disabled) { background: #eef1f5; color: var(--text); }
 .series-toggle button.active { background: var(--navy); color: #fff; }
-.series-toggle button:disabled { cursor: not-allowed; }
+.series-toggle button:disabled { cursor: not-allowed; opacity: 0.4; }
 
 .product-meta {
   font-size: 0.85rem;

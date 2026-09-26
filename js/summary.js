@@ -202,7 +202,7 @@ async function renderSummaryTable() {
     });
   });
   if (!anyRows) {
-    body.innerHTML = `<tr><td colspan="${colCount}">No data for this window/year.</td></tr>`;
+    body.innerHTML = `<tr><td class="no-data-cell" colspan="${colCount}">No data for this window/year.</td></tr>`;
   }
 }
 

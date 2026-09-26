@@ -209,11 +209,14 @@ async function renderHeatmap() {
 
   const trace = {
     x: xLabels, y: yLabels, z, type: "heatmap",
-    // Plotly's built-in "RdBu" has a pale gray midpoint, not white -- spell
-    // out the stops explicitly so zero (dry/wet-neutral) renders pure white.
-    // Order matches the old "RdBu" + reversescale:true (blue low -> red high).
+    // NCL/ColorBrewer BrBG (via the cmaps package), matching the site's
+    // stress=gold/relief=teal convention (data.html, css/style.css) instead
+    // of red/blue -- freeing red exclusively for the "no data" state
+    // (Dylan, 2026-09). Stops spelled out explicitly, same as before, so
+    // zero (dry/wet-neutral) renders pure white rather than BrBG's natural
+    // pale-tan midpoint. Order: teal (relief) low -> gold (stress) high.
     colorscale: [
-      [0, "#2166ac"], [0.25, "#67a9cf"], [0.5, "#ffffff"], [0.75, "#ef8a62"], [1, "#b2182b"],
+      [0, "#0e726a"], [0.25, "#84cfc3"], [0.5, "#ffffff"], [0.75, "#dfc37e"], [1, "#955910"],
     ],
     zmid: 0,
     // Stress/relief key is the legend above the chart (data.html) -- this

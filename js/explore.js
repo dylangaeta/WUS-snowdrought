@@ -465,10 +465,18 @@ const compareState = {
   // whatever the user had checked/unchecked (Dylan, 2026-09).
   checkedByCategory: {},
 };
+// NCL StepSeq25 (via the cmaps package), reordered hue-first-then-shade so
+// the first 5 entries alone span 5 distinct hues -- the biggest category
+// (vegetation) has 27 product/response pairs, so a 12-color palette put
+// items 12 apart in identical colors with nothing else to distinguish them
+// (Dylan, 2026-09). 25 colors leaves only one collision in the worst case,
+// and none in the common case of a handful of checked series.
 const CATEGORY_OVERLAY_COLORS = [
-  "#205493", "#a0290f", "#2e8540", "#946e00", "#5c3d99",
-  "#00767a", "#b5390c", "#3a6b8a", "#8a3a6b", "#556b2f",
-  "#a0522d", "#4b5320",
+  "#990f0f", "#99540f", "#6b990f", "#0f6b99", "#260f99",
+  "#b22c2c", "#b26f2c", "#85b22c", "#2c85b2", "#422cb2",
+  "#cc5151", "#cc8e51", "#a3cc51", "#51a3cc", "#6551cc",
+  "#e57e7e", "#e5b17e", "#c3e57e", "#7ec3e5", "#8f7ee5",
+  "#ffb2b2", "#ffd8b2", "#e5ffb2", "#b2e5ff", "#bfb2ff",
 ];
 
 function initCompareView() {

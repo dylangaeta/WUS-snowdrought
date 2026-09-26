@@ -381,6 +381,27 @@ async function fetchMapStyle(product, response) {
 // show a year slider scoped to whichever years that mode's COGs actually
 // cover for this specific period/product (gaps are real -- e.g. a product's
 // own record start -- not guessed).
+// Disables a mode button before the user clicks it into a blank map, rather
+// than only reacting after the fact -- e.g. a product's raw-value COGs are
+// still mid-rollout for this period (Dylan, 2026-09). Falls back to
+// Climatology (always available whenever a period slot exists at all) if
+// the currently active mode just became unavailable for the new period.
+function updateModeToggleAvailability(slot) {
+  document.querySelectorAll("#ol-mode-toggle button[data-mode]").forEach((btn) => {
+    const mode = btn.dataset.mode;
+    const available = mode === "climatology"
+      ? "baseline" in slot
+      : Object.keys(slot).some((k) => k.startsWith(`${mode}_`));
+    btn.disabled = !available;
+    btn.title = available ? "" : "No data for this mode in the selected period.";
+    if (!available && btn.classList.contains("active")) {
+      btn.classList.remove("active");
+      olMapState.mode = "climatology";
+      document.querySelector('#ol-mode-toggle button[data-mode="climatology"]').classList.add("active");
+    }
+  });
+}
+
 function updateYearControlForPeriod(slot) {
   const sliderWrap = document.getElementById("ol-year-slider-wrap");
   const slider = document.getElementById("ol-year-slider");
@@ -430,6 +451,7 @@ async function updateInteractiveMapLayer() {
     return;
   }
   const slot = style.periods[olMapState.period];
+  updateModeToggleAvailability(slot);
   updateYearControlForPeriod(slot);
   const key = olMapState.mode === "climatology" ? "baseline" : `${olMapState.mode}_${olMapState.year}`;
   const fileEntry = slot[key];
