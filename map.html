@@ -62,7 +62,10 @@
           <label class="select-field">Variable <select id="response-select" aria-label="Variable"></select></label>
         </div>
         <div class="map-controls">
-          <select id="ol-period-select" aria-label="Month or season"></select>
+          <div class="ol-period-slider" id="ol-period-slider">
+            <button type="button" id="ol-period-play" class="ol-period-play" aria-label="Play through the months" title="Play through the months">&#9654;</button>
+            <div class="ol-period-track" id="ol-period-track" role="group" aria-label="Month or season"></div>
+          </div>
           <div class="series-toggle" id="ol-mode-toggle">
             <button type="button" data-mode="climatology" class="active">Climatology</button>
             <button type="button" data-mode="raw">Raw units</button>
@@ -80,10 +83,8 @@
         <div class="product-meta" id="product-meta"></div>
         <div id="ol-map-empty" class="map-empty" style="display:none;">No interactive map available for this selection.</div>
         <div id="ol-map-wrap">
+          <div id="ol-legend"></div>
           <div id="ol-map" aria-label="Interactive map"></div>
-          <div class="ol-sidebar">
-            <div id="ol-legend"></div>
-          </div>
         </div>
         <div id="ol-query-readout">Click the map to read a pixel value.</div>
         <div class="ol-actions">
@@ -113,8 +114,11 @@
     <p>
       Source: snowdrought-carbon (private research codebase, NOAA
       Global Monitoring Laboratory &middot; Cooperative Institute for
-      Research in Environmental Sciences). See <a href="about.html">About</a>
-      for methodology, references, and contact information.
+      Research in Environmental Sciences).
+    </p>
+    <p>
+      See <a href="about.html">About</a> for methodology, references, and
+      contact information.
     </p>
   </div>
 </footer>

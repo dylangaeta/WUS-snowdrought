@@ -558,7 +558,53 @@ table.headline-table tr.group-row td {
 .region-buttons button:hover:not(.active) { background: #eef1f5; color: var(--text); }
 .region-buttons button.active { background: var(--blue-dark); color: #fff; border-color: var(--blue-dark); }
 
-.map-controls { display: flex; flex-wrap: wrap; gap: 0.8rem; margin-bottom: 0.8rem; }
+.map-controls { display: flex; flex-wrap: wrap; gap: 0.8rem; margin-bottom: 0.8rem; align-items: center; }
+
+/* Period picker as a slider (Dylan, 2026-10): a play button + a track of
+   discrete stops. The longer seasonal windows sit first in their own shaded,
+   rounded band so they read as seasons, not months; the 12 months follow as
+   compact single-letter stops that the play button animates through. */
+.ol-period-slider { display: inline-flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.ol-period-play {
+  flex: none;
+  width: 2rem; height: 2rem;
+  border: 1px solid var(--navy);
+  border-radius: 50%;
+  background: var(--navy);
+  color: #fff;
+  font-size: 0.8rem;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.ol-period-play:hover { background: var(--blue-dark); border-color: var(--blue-dark); }
+.ol-period-play.playing { background: var(--gold); border-color: var(--gold); }
+.ol-period-track { display: inline-flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.ol-period-group { display: inline-flex; gap: 2px; }
+/* Seasons: a shaded, rounded band visually distinct from the month stops. */
+.ol-period-seasons {
+  background: rgba(58, 134, 188, 0.12);
+  border: 1px solid var(--blue);
+  border-radius: 999px;
+  padding: 2px;
+}
+.ol-period-sep { width: 1px; background: var(--border); align-self: stretch; margin: 3px 0; }
+.ol-period-months { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 2px; }
+.ol-period-stop {
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.25rem 0.55rem;
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ol-period-stop:hover { color: var(--text); background: rgba(2, 56, 88, 0.06); }
+.ol-period-stop.active { background: var(--navy); color: #fff; border-color: var(--navy); }
+/* Months: compact fixed-width single-letter stops forming the slider track. */
+.ol-period-month { width: 1.5rem; padding: 0.25rem 0; text-align: center; border-radius: var(--radius-sm); }
 /* Keep the Dataset/Variable + period/mode/year controls in view while scrolling
    the map and the regional table below -- they sit just under the sticky site
    header (~120px tall). On mobile the header wraps taller and a sticky bar would
@@ -664,24 +710,19 @@ table.headline-table tr.group-row td {
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-sm);
   padding: 0.75rem;
-  /* Once the map's own width follows its real (near-square) aspect ratio
-     instead of stretching to fill the panel, the panel's own width leaves a
-     lot of empty space to the map's right -- the legend, pixel readout, and
-     action buttons live there now instead of stacked below the map. */
-  display: grid;
-  /* 1fr stretched the sidebar to fill whatever space was left of the map,
-     but the legend itself is only ever a narrow swatch bar + short tick
-     labels -- confirmed live: ~250px of blank space sat to its right, with
-     only the (already full-width, flex-stretched) action buttons below
-     using the column's actual width. max-content sizes it to its real
-     content -- the buttons' own text -- with .ol-sidebar's min-width below
-     as the floor. */
-  grid-template-columns: max-content max-content;
-  gap: 1.25rem;
-  align-items: start;
+  /* The colorbar now sits horizontally ABOVE the map (Dylan, 2026-10), so the
+     map no longer shares its row with a sidebar legend. A fit-content column
+     sizes the whole card to the map's own aspect-ratio-driven width, with the
+     colorbar stretched to exactly that width directly above the map. */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  width: fit-content;
+  max-width: 100%;
 }
 @media (max-width: 820px) {
-  #ol-map-wrap { grid-template-columns: 1fr; }
+  #ol-map-wrap { width: 100%; }
 }
 /* The Fullscreen API hands the whole viewport to #ol-map-wrap -- let the map
    grow to use that space instead of staying pinned at its normal 600px. */
@@ -703,68 +744,55 @@ table.headline-table tr.group-row td {
    sits under this map's own "Reset view"/"Full screen" buttons there --
    bottom-left is clear on every product's domain extent. */
 #ol-map .ol-attribution { right: auto; left: 0.5em; }
-.ol-sidebar { min-width: 0; }
 #ol-legend {
+  align-self: stretch; /* colorbar spans the map's full width directly above it */
   font-size: 0.85rem;
   color: var(--text-muted);
 }
 .ol-legend-label {
   display: block;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.35rem;
   font-size: 0.9rem;
   font-weight: 600;
   color: var(--text);
 }
+/* Horizontal bar above the map (Dylan, 2026-10): equal-width bins run
+   left-to-right, lowest value on the left, spanning the full map width. The
+   wrap reserves space below for the absolutely-positioned break ticks. */
+.ol-legend-scale-wrap { position: relative; width: 100%; margin-bottom: 1.5rem; }
 .ol-legend-scale {
-  /* Vertical, not a horizontal bar -- the sidebar this lives in is narrow
-     and tall, so bins stack top-to-bottom (highest value on top, the
-     standard vertical-colorbar convention) instead of needing a bar wider
-     than the column it's in. Tick text sits to the right of each swatch, so
-     there's no fixed-width-per-swatch constraint to fight regardless of how
-     many digits a value needs. */
   display: flex;
-  flex-direction: column;
-  margin-bottom: 1rem;
+  flex-direction: row;
+  height: 16px;
+  /* Black perimeter so the lightest (near-white) end swatch stays
+     distinguishable from the white panel behind it (Dylan, 2026-10). */
+  box-shadow: 0 0 0 1px #1b1b1b;
 }
-/* A slim reference-legend bar (matches the climatology/raw gradient bar
-   directly below, same --legend-bar-width) with tick labels sitting in
-   the wide open space to the right -- not a wide block filling the sidebar
-   (confirmed live, 2026-09-28: a near-full-width bar read as visually
-   heavier/worse than two consistent slim bars, not better). */
-/* Explicit width (not just the swatches' own) is required here: without it
-   this wrapper div stretches to the full sidebar width (default block
-   behavior), so .ol-legend-ticks' "left: 100%" below resolves against that
-   full sidebar width instead of the narrow colorbar -- pushing every tick
-   label off to the sidebar's right edge instead of next to its swatch
-   (confirmed 2026-09-30 against a real screenshot). */
-.ol-legend-scale-wrap { position: relative; width: var(--legend-bar-width); }
-.ol-legend-swatch { display: block; width: var(--legend-bar-width); height: 34px; }
-/* Ticks are a separate absolutely-positioned overlay, not a child of each
-   swatch -- a tick marks the BREAK between two colors (Dylan, 2026-09-29:
-   "the colorbar ticks should be the color breaks, not a single point label
-   for a whole bin"), so it must sit exactly on the seam line, not floating
-   centered inside one bin. `top` is set per-tick inline (see map-viewer.js)
-   at i * LEGEND_SWATCH_HEIGHT_PX from the top of the whole scale. */
-.ol-legend-ticks { position: absolute; top: 0; left: 100%; margin-left: 8px; }
+.ol-legend-swatch { flex: 1 1 0; min-width: 0; height: 100%; }
+/* Ticks are a separate absolutely-positioned overlay below the bar -- a tick
+   marks the BREAK between two colors (Dylan, 2026-09-29: "the colorbar ticks
+   should be the color breaks, not a single point label for a whole bin"), so
+   it sits exactly on the seam. `left` is set per-tick inline (map-viewer.js)
+   at i/nBins of the bar width. */
+.ol-legend-ticks { position: absolute; top: 100%; left: 0; width: 100%; height: 1.4em; margin-top: 5px; }
 .ol-legend-tick {
   position: absolute;
-  left: 0;
-  transform: translateY(-50%);
+  top: 0;
+  transform: translateX(-50%);
   font-size: 12px;
   white-space: nowrap;
   color: var(--text-muted);
 }
-/* A short tick mark on each break, sitting in the gap between the colorbar and
-   its value, so every color break reads as a real axis tick, not a floating
-   number. */
+/* A short vertical tick mark above each value, in the gap between the colorbar
+   and its label, so every break reads as a real axis tick. */
 .ol-legend-tick::before {
   content: "";
   position: absolute;
-  right: 100%;
-  top: 50%;
-  margin-right: 3px;
-  width: 6px;
-  border-top: 1px solid var(--text-muted);
+  left: 50%;
+  bottom: 100%;
+  margin-bottom: 2px;
+  height: 5px;
+  border-left: 1px solid var(--text-muted);
 }
 #ol-query-readout { margin-top: 0.6rem; font-size: 0.9rem; color: var(--text); min-height: 1.2em; }
 /* Horizontal wrapping row below the map -- the map + colorbar now take the
